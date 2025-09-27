@@ -26,8 +26,8 @@ module.exports = {
       accounts: [process.env.PRIVATE_KEY],
     },
     citrea: {
-      url: process.env.CITREA_RPC_URL,
-      chainId:5115,
+      url: "https://rpc.testnet.citrea.xyz",
+      chainId: 5115,
       accounts: [process.env.PRIVATE_KEY],
     },
   },

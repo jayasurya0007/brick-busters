@@ -32,7 +32,9 @@ async function main() {
     deployer.address,  // creator wallet address
     ethers.encodeBytes32String("deed_hash_example"),
     ethers.encodeBytes32String("appraisal_hash_example"),
-    ethers.encodeBytes32String("kyc_hash_example")
+    ethers.encodeBytes32String("kyc_hash_example"),
+    ethers.parseEther("1000000"), // Property value: 1,000,000 ETH
+    ethers.parseEther("1000000")  // Total tokens: 1,000,000 tokens (1 token = 1 ETH)
   );
 
   const receipt = await tx.wait();

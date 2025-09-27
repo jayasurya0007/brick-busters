@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useWeb3 } from '../context/Web3Context';
 import { Building, Users, TrendingUp, ArrowLeft, ExternalLink } from 'lucide-react';
+import { ethers } from 'ethers';
 import toast from 'react-hot-toast';
 
 const PropertyDetails = () => {
@@ -40,7 +41,11 @@ const PropertyDetails = () => {
         tokenContract: propertyData.tokenContract,
         deedHash: propertyData.deedHash,
         appraisalHash: propertyData.appraisalHash,
-        kycDocHash: propertyData.kycDocHash
+        kycDocHash: propertyData.kycDocHash,
+        propertyValue: propertyData.propertyValue,
+        totalTokens: propertyData.totalTokens,
+        tokenPrice: propertyData.tokenPrice,
+        isActive: propertyData.isActive
       });
 
       // Load token information
@@ -170,6 +175,37 @@ const PropertyDetails = () => {
                 <p className="text-sm text-gray-600">Token Contract</p>
                 <p className="font-medium text-gray-900 font-mono text-sm">
                   {property.tokenContract.slice(0, 6)}...{property.tokenContract.slice(-4)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Market Information */}
+          <div className="card">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Market Information</h2>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-600">Property Value</p>
+                <p className="font-medium text-gray-900">
+                  {ethers.formatEther(property.propertyValue)} ETH
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Total Tokens</p>
+                <p className="font-medium text-gray-900">
+                  {ethers.formatEther(property.totalTokens)} {property.symbol}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Token Price</p>
+                <p className="font-medium text-gray-900">
+                  {ethers.formatEther(property.tokenPrice)} ETH
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Trading Status</p>
+                <p className={`font-medium ${property.isActive ? 'text-green-600' : 'text-red-600'}`}>
+                  {property.isActive ? 'Active' : 'Inactive'}
                 </p>
               </div>
             </div>

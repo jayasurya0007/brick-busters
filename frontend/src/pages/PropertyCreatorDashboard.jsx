@@ -75,6 +75,18 @@ const PropertyCreatorDashboard = () => {
       return;
     }
 
+    // Check if user is the creator of this property
+    const selectedProperty = properties.find(p => p.id === parseInt(mintForm.propertyId));
+    if (!selectedProperty) {
+      toast.error('Property not found');
+      return;
+    }
+
+    if (selectedProperty.creator.toLowerCase() !== account?.toLowerCase()) {
+      toast.error('You can only mint tokens for properties you created');
+      return;
+    }
+
     try {
       setLoading(true);
       const tx = await contracts.multiPropertyManager.mintTokens(
@@ -87,7 +99,11 @@ const PropertyCreatorDashboard = () => {
       setMintForm({ propertyId: '', recipient: '', amount: '' });
     } catch (error) {
       console.error('Error minting tokens:', error);
-      toast.error('Failed to mint tokens');
+      if (error.message.includes('Ownable: caller is not the owner')) {
+        toast.error('You are not authorized to mint tokens for this property');
+      } else {
+        toast.error('Failed to mint tokens');
+      }
     } finally {
       setLoading(false);
     }
@@ -182,9 +198,14 @@ const PropertyCreatorDashboard = () => {
           </button>
         </div>
         {myProperties.length === 0 && (
-          <p className="text-sm text-gray-500 mt-2">
-            You don't have any properties yet. Contact an admin to create a property for you.
-          </p>
+          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-sm text-yellow-800">
+              <strong>No properties found:</strong> You don't have any properties yet. Contact an admin to create a property for you.
+            </p>
+            <p className="text-xs text-yellow-700 mt-1">
+              Only property creators can mint tokens for their properties.
+            </p>
+          </div>
         )}
       </div>
 

@@ -8,6 +8,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import PropertyCreatorDashboard from './pages/PropertyCreatorDashboard';
 import InvestorDashboard from './pages/InvestorDashboard';
 import PropertyDetails from './pages/PropertyDetails';
+import Marketplace from './components/Marketplace';
 import './App.css';
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/creator" element={<PropertyCreatorDashboard />} />
               <Route path="/investor" element={<InvestorDashboard />} />
+              <Route path="/marketplace" element={<Marketplace />} />
               <Route path="/property/:id" element={<PropertyDetails />} />
             </Routes>
           </Layout>

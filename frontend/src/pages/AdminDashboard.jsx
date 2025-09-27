@@ -13,7 +13,9 @@ const AdminDashboard = () => {
     creator: '',
     deedHash: '',
     appraisalHash: '',
-    kycDocHash: ''
+    kycDocHash: '',
+    propertyValue: '',
+    totalTokens: ''
   });
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -96,7 +98,7 @@ const AdminDashboard = () => {
   };
 
   const addProperty = async () => {
-    if (!propertyForm.name || !propertyForm.symbol || !propertyForm.creator) {
+    if (!propertyForm.name || !propertyForm.symbol || !propertyForm.creator || !propertyForm.propertyValue || !propertyForm.totalTokens) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -109,7 +111,9 @@ const AdminDashboard = () => {
         propertyForm.creator,
         propertyForm.deedHash || ethers.encodeBytes32String('default_deed'),
         propertyForm.appraisalHash || ethers.encodeBytes32String('default_appraisal'),
-        propertyForm.kycDocHash || ethers.encodeBytes32String('default_kyc')
+        propertyForm.kycDocHash || ethers.encodeBytes32String('default_kyc'),
+        ethers.parseEther(propertyForm.propertyValue),
+        ethers.parseEther(propertyForm.totalTokens)
       );
       await tx.wait();
       toast.success('Property added successfully');
@@ -119,7 +123,9 @@ const AdminDashboard = () => {
         creator: '',
         deedHash: '',
         appraisalHash: '',
-        kycDocHash: ''
+        kycDocHash: '',
+        propertyValue: '',
+        totalTokens: ''
       });
       loadProperties();
     } catch (error) {
@@ -285,6 +291,26 @@ const AdminDashboard = () => {
               value={propertyForm.creator}
               onChange={(e) => setPropertyForm({...propertyForm, creator: e.target.value})}
               placeholder="0x..."
+              className="input-field"
+            />
+          </div>
+          <div>
+            <label className="label">Property Value (ETH) *</label>
+            <input
+              type="number"
+              value={propertyForm.propertyValue}
+              onChange={(e) => setPropertyForm({...propertyForm, propertyValue: e.target.value})}
+              placeholder="1000000"
+              className="input-field"
+            />
+          </div>
+          <div>
+            <label className="label">Total Tokens *</label>
+            <input
+              type="number"
+              value={propertyForm.totalTokens}
+              onChange={(e) => setPropertyForm({...propertyForm, totalTokens: e.target.value})}
+              placeholder="1000000"
               className="input-field"
             />
           </div>

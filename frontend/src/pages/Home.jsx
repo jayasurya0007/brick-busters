@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useWeb3 } from '../context/Web3Context';
 import { Building, Shield, Users, TrendingUp, CheckCircle, AlertCircle } from 'lucide-react';
-import NetworkSwitcher from '../components/NetworkSwitcher';
 import toast from 'react-hot-toast';
 
 const Home = () => {
@@ -172,9 +171,6 @@ const Home = () => {
 
   return (
     <div className="space-y-8">
-      {/* Network Switcher */}
-      <NetworkSwitcher />
-
       {/* Loading State for Connected Users */}
       {loading && (
         <div className="text-center py-8">

@@ -115,6 +115,10 @@ contract MultiPropertyTokenManager is Ownable, Pausable {
         bytes32 appraisalHash;
         bytes32 kycDocHash;
         PropertyERC20 tokenContract;
+        uint256 propertyValue; // Property valuation in wei
+        uint256 totalTokens; // Total tokens to be minted
+        uint256 tokenPrice; // Price per token in wei
+        bool isActive; // Whether property is active for trading
     }
 
     uint256 public nextPropertyId = 1;
@@ -130,8 +134,9 @@ contract MultiPropertyTokenManager is Ownable, Pausable {
     mapping(uint256 => mapping(address => mapping(address => uint256))) public withdrawnTokenRevenue;
 
     // Events
-    event PropertyAdded(uint256 indexed propertyId, string name, string symbol, address tokenAddress, address creator);
+    event PropertyAdded(uint256 indexed propertyId, string name, string symbol, address tokenAddress, address creator, uint256 propertyValue, uint256 totalTokens, uint256 tokenPrice);
     event TokensMinted(uint256 indexed propertyId, address indexed to, uint256 amount);
+    event TokensPurchased(uint256 indexed propertyId, address indexed buyer, uint256 amount, uint256 totalCost);
     event EthRevenueDeposited(uint256 indexed propertyId, uint256 amount);
     event EthRevenueWithdrawn(uint256 indexed propertyId, address indexed wallet, uint256 amount);
     event TokenRevenueDeposited(uint256 indexed propertyId, address indexed token, uint256 amount);
@@ -159,11 +164,17 @@ contract MultiPropertyTokenManager is Ownable, Pausable {
         address creator_,
         bytes32 deedHash_,
         bytes32 appraisalHash_,
-        bytes32 kycDocHash_
+        bytes32 kycDocHash_,
+        uint256 propertyValue_,
+        uint256 totalTokens_
     ) external onlyOwner whenNotPaused returns (uint256) {
         require(creator_ != address(0), "Invalid creator");
+        require(propertyValue_ > 0, "Invalid property value");
+        require(totalTokens_ > 0, "Invalid total tokens");
 
         uint256 propertyId = nextPropertyId++;
+        uint256 tokenPrice = propertyValue_ / totalTokens_; // Price per token
+        
         PropertyERC20 token = new PropertyERC20(
             name_,
             symbol_,
@@ -179,10 +190,14 @@ contract MultiPropertyTokenManager is Ownable, Pausable {
             deedHash: deedHash_,
             appraisalHash: appraisalHash_,
             kycDocHash: kycDocHash_,
-            tokenContract: token
+            tokenContract: token,
+            propertyValue: propertyValue_,
+            totalTokens: totalTokens_,
+            tokenPrice: tokenPrice,
+            isActive: true
         });
 
-        emit PropertyAdded(propertyId, name_, symbol_, address(token), creator_);
+        emit PropertyAdded(propertyId, name_, symbol_, address(token), creator_, propertyValue_, totalTokens_, tokenPrice);
         return propertyId;
     }
 
@@ -194,6 +209,55 @@ contract MultiPropertyTokenManager is Ownable, Pausable {
 
         prop.tokenContract.mint(to, amount);
         emit TokensMinted(propertyId, to, amount);
+    }
+
+    /// @notice Buy tokens directly from the property creator
+    function buyTokens(uint256 propertyId, uint256 amount) external payable whenNotPaused onlyVerified(msg.sender) {
+        Property storage prop = properties[propertyId];
+        require(address(prop.tokenContract) != address(0), "Property not found");
+        require(prop.isActive, "Property not active for trading");
+        
+        uint256 totalCost = prop.tokenPrice * amount;
+        require(msg.value >= totalCost, "Insufficient payment");
+        
+        // Check if creator has enough tokens to sell
+        uint256 creatorBalance = prop.tokenContract.balanceOf(prop.creator);
+        require(creatorBalance >= amount, "Insufficient tokens available");
+        
+        // Transfer tokens from creator to buyer
+        prop.tokenContract.transferFrom(prop.creator, msg.sender, amount);
+        
+        // Transfer payment to creator
+        payable(prop.creator).transfer(totalCost);
+        
+        // Refund excess payment
+        if (msg.value > totalCost) {
+            payable(msg.sender).transfer(msg.value - totalCost);
+        }
+        
+        emit TokensPurchased(propertyId, msg.sender, amount, totalCost);
+    }
+
+    /// @notice Get property market data
+    function getPropertyMarketData(uint256 propertyId) external view returns (
+        uint256 propertyValue,
+        uint256 totalTokens,
+        uint256 tokenPrice,
+        uint256 availableTokens,
+        bool isActive
+    ) {
+        Property storage prop = properties[propertyId];
+        require(address(prop.tokenContract) != address(0), "Property not found");
+        
+        uint256 creatorBalance = prop.tokenContract.balanceOf(prop.creator);
+        
+        return (
+            prop.propertyValue,
+            prop.totalTokens,
+            prop.tokenPrice,
+            creatorBalance,
+            prop.isActive
+        );
     }
 
     /// @notice Deposit ETH revenue for property
