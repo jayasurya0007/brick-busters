@@ -157,7 +157,12 @@ export const Web3Provider = ({ children }) => {
       setContracts({
         identityRegistry,
         complianceModule,
-        multiPropertyManager
+        multiPropertyManager: {
+          ...multiPropertyManager,
+          runner: provider, // Add runner for read-only calls
+          signer: signer,   // Keep signer for write operations
+          provider: provider // Add provider for mixed operations
+        }
       });
     } catch (error) {
       console.error('Error initializing contracts:', error);

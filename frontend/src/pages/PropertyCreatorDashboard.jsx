@@ -116,8 +116,12 @@ const PropertyCreatorDashboard = () => {
       return;
     }
 
+    console.log('Selected property:', selectedProperty);
+    console.log('Current account:', account);
+    console.log('Property creator:', selectedProperty.creator);
+
     if (selectedProperty.creator.toLowerCase() !== account?.toLowerCase()) {
-      toast.error('You can only prepare tokens for properties you created');
+      toast.error(`You can only prepare tokens for properties you created. This property was created by ${selectedProperty.creator.slice(0, 6)}...${selectedProperty.creator.slice(-4)}`);
       return;
     }
 
@@ -128,6 +132,9 @@ const PropertyCreatorDashboard = () => {
       const property = await contracts.multiPropertyManager.properties(propertyId);
       const totalTokens = property.totalTokens;
       
+      console.log('Property total tokens:', totalTokens.toString());
+      console.log('Attempting to mint tokens...');
+      
       // Mint all tokens to the creator
       const mintTx = await contracts.multiPropertyManager.mintTokens(
         propertyId,
@@ -135,6 +142,8 @@ const PropertyCreatorDashboard = () => {
         totalTokens
       );
       await mintTx.wait();
+      
+      console.log('Tokens minted successfully, now approving contract...');
       
       // Approve the contract to transfer tokens for trading
       const tokenContract = new ethers.Contract(
@@ -149,11 +158,18 @@ const PropertyCreatorDashboard = () => {
       const approveTx = await tokenContract.approve(contracts.multiPropertyManager.address, totalTokens);
       await approveTx.wait();
       
+      console.log('Contract approved successfully');
       toast.success('Tokens minted and approved for trading successfully');
       await loadProperties(); // Refresh properties
     } catch (error) {
       console.error('Error preparing tokens for sale:', error);
-      toast.error('Failed to prepare tokens for sale');
+      if (error.message.includes('Ownable: caller is not the owner')) {
+        toast.error('You are not authorized to mint tokens for this property. Only the property creator or contract owner can mint tokens.');
+      } else if (error.message.includes('Unauthorized')) {
+        toast.error('You are not authorized to mint tokens for this property.');
+      } else {
+        toast.error(`Failed to prepare tokens for sale: ${error.message}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -265,11 +281,14 @@ const PropertyCreatorDashboard = () => {
           <Building className="h-5 w-5 mr-2" />
           My Properties ({myProperties.length})
         </h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Properties you created. You can mint and prepare tokens for these properties.
+        </p>
         {myProperties.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <Building className="h-12 w-12 text-gray-300 mx-auto mb-4" />
             <p>You don't have any properties yet.</p>
-            <p className="text-sm">Contact an admin to create a property for you.</p>
+            <p className="text-sm">Upload a property in the marketplace to get started.</p>
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -286,13 +305,19 @@ const PropertyCreatorDashboard = () => {
                   <div>Token Contract: {property.tokenContract.slice(0, 6)}...{property.tokenContract.slice(-4)}</div>
                 </div>
                 <div className="flex space-x-2">
-                  <button 
-                    onClick={() => prepareTokensForSale(property.id)}
-                    disabled={loading}
-                    className="btn-primary text-sm flex-1"
-                  >
-                    {loading ? 'Preparing...' : 'Prepare for Sale'}
-                  </button>
+                  {property.creator.toLowerCase() === account?.toLowerCase() ? (
+                    <button 
+                      onClick={() => prepareTokensForSale(property.id)}
+                      disabled={loading}
+                      className="btn-primary text-sm flex-1"
+                    >
+                      {loading ? 'Preparing...' : 'Prepare for Sale'}
+                    </button>
+                  ) : (
+                    <div className="flex-1 text-sm text-gray-500 text-center py-2">
+                      Created by {property.creator.slice(0, 6)}...{property.creator.slice(-4)}
+                    </div>
+                  )}
                   <button className="btn-secondary text-sm flex-1">
                     View Details
                   </button>

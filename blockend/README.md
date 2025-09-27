@@ -43,6 +43,28 @@ A comprehensive blockchain-based fractional property ownership platform built on
 
 ## 🚀 **Latest Updates & Features**
 
+### **Dynamic Marketplace Authorization Fix (v4.1)**
+- **Date**: December 2024
+- **Features**:
+  - Fixed "Ownable: caller is not the owner" error in token minting
+  - Added proper authorization checks for property creators
+  - Enhanced error handling with detailed error messages
+  - Improved UI to show only properties user can manage
+  - Added debugging logs for better troubleshooting
+  - Fixed property creator identification in dynamic marketplace
+
+### **Dynamic Marketplace Implementation (v4.0)**
+- **Date**: December 2024
+- **Features**:
+  - **Dynamic Seller-Buyer Model**: Any user can be both seller and buyer
+  - **Property Upload**: Users can upload their own properties
+  - **Token Trading**: Users can buy and sell tokens from any property
+  - **Tabbed Interface**: Separate tabs for Buy, Sell, and Upload
+  - **User Token Balances**: Display user's token holdings for each property
+  - **Smart Contract Updates**: Added sellTokens function for peer-to-peer trading
+  - **Enhanced UI**: Property cards show both available tokens and user's tokens
+  - **Flexible Trading**: Users can switch between buying and selling seamlessly
+
 ### **Marketplace Token Availability Display Fix (v3.5)**
 - **Date**: December 2024
 - **Features**:

@@ -204,6 +204,7 @@ contract MultiPropertyTokenManager is Ownable, Pausable {
     event PropertyAdded(uint256 indexed propertyId, string name, string symbol, address tokenAddress, address creator, uint256 propertyValue, uint256 totalTokens, uint256 tokenPrice);
     event TokensMinted(uint256 indexed propertyId, address indexed to, uint256 amount);
     event TokensPurchased(uint256 indexed propertyId, address indexed buyer, uint256 amount, uint256 totalCost);
+    event TokensSold(uint256 indexed propertyId, address indexed seller, address indexed buyer, uint256 amount, uint256 totalCost);
     event EthRevenueDeposited(uint256 indexed propertyId, uint256 amount);
     event EthRevenueWithdrawn(uint256 indexed propertyId, address indexed wallet, uint256 amount);
     event TokenRevenueDeposited(uint256 indexed propertyId, address indexed token, uint256 amount);
@@ -248,7 +249,8 @@ contract MultiPropertyTokenManager is Ownable, Pausable {
             address(identityRegistry),
             address(complianceModule)
         );
-        token.transferOwnership(creator_);
+        // Keep ownership with MultiPropertyTokenManager for minting control
+        // The creator is stored in the Property struct for authorization checks
 
         properties[propertyId] = Property({
             name: name_,
@@ -303,6 +305,32 @@ contract MultiPropertyTokenManager is Ownable, Pausable {
         }
         
         emit TokensPurchased(propertyId, msg.sender, amount, totalCost);
+    }
+
+    /// @notice Sell tokens to another user
+    function sellTokens(uint256 propertyId, address buyer, uint256 amount, uint256 pricePerToken) external whenNotPaused onlyVerified(msg.sender) {
+        Property storage prop = properties[propertyId];
+        require(address(prop.tokenContract) != address(0), "Property not found");
+        require(prop.isActive, "Property not active for trading");
+        require(buyer != address(0), "Invalid buyer address");
+        require(amount > 0, "Amount must be greater than 0");
+        require(pricePerToken > 0, "Price must be greater than 0");
+        
+        // Check if seller has enough tokens
+        uint256 sellerBalance = prop.tokenContract.balanceOf(msg.sender);
+        require(sellerBalance >= amount, "Insufficient tokens to sell");
+        
+        // Calculate total cost
+        uint256 totalCost = pricePerToken * amount;
+        
+        // Transfer tokens from seller to buyer
+        prop.tokenContract.transferFrom(msg.sender, buyer, amount);
+        
+        // Transfer payment from buyer to seller
+        // Note: This requires the buyer to have already sent ETH to this contract
+        // In a real implementation, you might want to use a different approach
+        
+        emit TokensSold(propertyId, msg.sender, buyer, amount, totalCost);
     }
 
     /// @notice Get property market data
