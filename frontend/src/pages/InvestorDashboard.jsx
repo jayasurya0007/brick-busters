@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useWeb3 } from '../context/Web3Context';
-import { Users, TrendingUp, Wallet, ArrowUpRight } from 'lucide-react';
+import { Users, TrendingUp, Wallet, ArrowUpRight, Building } from 'lucide-react';
+import { ethers } from 'ethers';
 import toast from 'react-hot-toast';
 
 const InvestorDashboard = () => {

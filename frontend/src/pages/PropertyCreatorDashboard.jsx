@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useWeb3 } from '../context/Web3Context';
 import { Building, Users, Plus, TrendingUp, Wallet } from 'lucide-react';
+import { ethers } from 'ethers';
 import toast from 'react-hot-toast';
 
 const PropertyCreatorDashboard = () => {

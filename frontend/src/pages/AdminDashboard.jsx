@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useWeb3 } from '../context/Web3Context';
 import { Shield, Building, Users, Plus, Pause, Play, CheckCircle, XCircle } from 'lucide-react';
+import { ethers } from 'ethers';
 import toast from 'react-hot-toast';
 
 const AdminDashboard = () => {
