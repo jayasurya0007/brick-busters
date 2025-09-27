@@ -43,6 +43,36 @@ A comprehensive blockchain-based fractional property ownership platform built on
 
 ## 🚀 **Latest Updates & Features**
 
+### **Marketplace Token Availability Display Fix (v3.5)**
+- **Date**: December 2024
+- **Features**:
+  - Fixed marketplace showing 0 available tokens despite property creation
+  - Corrected token availability calculation to use contract data
+  - Added visual indicators for token availability status
+  - Enhanced property cards with "Not minted" status
+  - Disabled purchase buttons when no tokens available
+  - Improved user understanding of token preparation workflow
+
+### **Marketplace Input Validation Fix (v3.4)**
+- **Date**: December 2024
+- **Features**:
+  - Fixed app crash when clicking on "Amount (Tokens)" input field
+  - Added input validation to prevent invalid number formats
+  - Improved error handling for ethers.parseEther operations
+  - Added safe total cost calculation with try-catch blocks
+  - Enhanced input field with proper number validation
+  - Prevented negative numbers and invalid characters
+
+### **Marketplace State Management Fix (v3.3)**
+- **Date**: December 2024
+- **Features**:
+  - Fixed marketplace properties disappearing after navigation
+  - Improved data loading sequence and state management
+  - Added proper useEffect dependencies for data reloading
+  - Added loading states and refresh functionality
+  - Enhanced debugging with console logging
+  - Fixed market data loading timing issues
+
 ### **Marketplace Token Purchase Fix (v3.2)**
 - **Date**: December 2024
 - **Features**:

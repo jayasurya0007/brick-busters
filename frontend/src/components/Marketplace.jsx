@@ -14,27 +14,46 @@ const Marketplace = () => {
   });
   const [loading, setLoading] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
+  const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
     if (isConnected && contracts.multiPropertyManager) {
       loadData();
+    } else if (isConnected && !contracts.multiPropertyManager) {
+      setDataLoading(false);
     }
   }, [isConnected, contracts]);
 
+  // Reload market data when properties change
+  useEffect(() => {
+    if (properties.length > 0) {
+      loadMarketData();
+    }
+  }, [properties]);
+
+  // Reload data when account changes
+  useEffect(() => {
+    if (isConnected && contracts.multiPropertyManager && account) {
+      loadData();
+    }
+  }, [account]);
+
   const loadData = async () => {
     try {
+      setDataLoading(true);
       // Check if user is verified
       if (account) {
         const verified = await isWalletVerified();
         setIsVerified(verified);
       }
 
-      // Load properties and market data
+      // Load properties first
       await loadProperties();
-      await loadMarketData();
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Failed to load marketplace data');
+    } finally {
+      setDataLoading(false);
     }
   };
 
@@ -43,6 +62,7 @@ const Marketplace = () => {
       if (!contracts.multiPropertyManager) return;
 
       const nextId = await contracts.multiPropertyManager.nextPropertyId();
+      console.log('Marketplace: Loading properties, nextId:', nextId);
       const propertyList = [];
 
       for (let i = 1; i < nextId; i++) {
@@ -64,6 +84,7 @@ const Marketplace = () => {
         }
       }
 
+      console.log('Marketplace: Loaded properties:', propertyList.length);
       setProperties(propertyList);
     } catch (error) {
       console.error('Error loading properties:', error);
@@ -74,19 +95,18 @@ const Marketplace = () => {
   const loadMarketData = async () => {
     try {
       if (!contracts.multiPropertyManager) return;
+      console.log('Marketplace: Loading market data for', properties.length, 'properties');
 
       const data = {};
       for (const property of properties) {
         try {
           const marketInfo = await contracts.multiPropertyManager.getPropertyMarketData(property.id);
-          // Get creator's token balance to see how many tokens are available for sale
-          const creatorBalance = await property.tokenContract.balanceOf(property.creator);
           
           data[property.id] = {
             propertyValue: marketInfo.propertyValue,
             totalTokens: marketInfo.totalTokens,
             tokenPrice: marketInfo.tokenPrice,
-            availableTokens: creatorBalance, // Use creator's actual balance
+            availableTokens: marketInfo.availableTokens, // Use the value from contract
             isActive: marketInfo.isActive
           };
         } catch (error) {
@@ -101,6 +121,7 @@ const Marketplace = () => {
           };
         }
       }
+      console.log('Marketplace: Market data loaded:', data);
       setMarketData(data);
     } catch (error) {
       console.error('Error loading market data:', error);
@@ -111,6 +132,13 @@ const Marketplace = () => {
   const buyTokens = async () => {
     if (!purchaseForm.propertyId || !purchaseForm.amount) {
       toast.error('Please fill in all fields');
+      return;
+    }
+
+    // Validate amount input
+    const amountValue = parseFloat(purchaseForm.amount);
+    if (isNaN(amountValue) || amountValue <= 0) {
+      toast.error('Please enter a valid amount greater than 0');
       return;
     }
 
@@ -126,8 +154,15 @@ const Marketplace = () => {
       return;
     }
 
-    const amount = ethers.parseEther(purchaseForm.amount);
-    const totalCost = marketInfo.tokenPrice * amount;
+    let amount, totalCost;
+    try {
+      amount = ethers.parseEther(purchaseForm.amount);
+      totalCost = marketInfo.tokenPrice * amount;
+    } catch (error) {
+      console.error('Error parsing amount:', error);
+      toast.error('Invalid amount format. Please enter a valid number.');
+      return;
+    }
 
     if (marketInfo.availableTokens < amount) {
       toast.error(`Insufficient tokens available. Only ${ethers.formatEther(marketInfo.availableTokens)} tokens available for purchase.`);
@@ -191,6 +226,16 @@ const Marketplace = () => {
     );
   }
 
+  if (dataLoading) {
+    return (
+      <div className="text-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Marketplace</h2>
+        <p className="text-gray-600">Please wait while we load available properties...</p>
+      </div>
+    );
+  }
+
   if (!isVerified) {
     return (
       <div className="text-center py-12">
@@ -207,9 +252,19 @@ const Marketplace = () => {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Property Token Marketplace</h1>
-        <p className="text-gray-600">Buy fractional ownership tokens for real estate properties</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Property Token Marketplace</h1>
+          <p className="text-gray-600">Buy fractional ownership tokens for real estate properties</p>
+        </div>
+        <button
+          onClick={loadData}
+          disabled={dataLoading}
+          className="btn-secondary flex items-center space-x-2"
+        >
+          <TrendingUp className="h-4 w-4" />
+          <span>Refresh</span>
+        </button>
       </div>
 
       {/* Purchase Form */}
@@ -239,8 +294,22 @@ const Marketplace = () => {
             <input
               type="number"
               value={purchaseForm.amount}
-              onChange={(e) => setPurchaseForm({...purchaseForm, amount: e.target.value})}
+              onChange={(e) => {
+                const value = e.target.value;
+                // Only allow positive numbers and decimal points
+                if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                  setPurchaseForm({...purchaseForm, amount: value});
+                }
+              }}
+              onKeyDown={(e) => {
+                // Prevent negative sign, 'e', 'E', '+', '-'
+                if (['e', 'E', '+', '-'].includes(e.key)) {
+                  e.preventDefault();
+                }
+              }}
               placeholder="100"
+              min="0"
+              step="0.000001"
               className="input-field"
             />
           </div>
@@ -258,10 +327,18 @@ const Marketplace = () => {
         {purchaseForm.propertyId && purchaseForm.amount && (
           <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-800">
-              <strong>Total Cost:</strong> {ethers.formatEther(
-                (marketData[purchaseForm.propertyId]?.tokenPrice || 0) * 
-                ethers.parseEther(purchaseForm.amount || '0')
-              )} ETH
+              <strong>Total Cost:</strong> {(() => {
+                try {
+                  const amount = parseFloat(purchaseForm.amount);
+                  if (isNaN(amount) || amount <= 0) return '0';
+                  const tokenPrice = marketData[purchaseForm.propertyId]?.tokenPrice || 0;
+                  const totalCost = tokenPrice * ethers.parseEther(amount.toString());
+                  return ethers.formatEther(totalCost);
+                } catch (error) {
+                  console.error('Error calculating total cost:', error);
+                  return '0';
+                }
+              })()} ETH
             </p>
           </div>
         )}
@@ -283,6 +360,7 @@ const Marketplace = () => {
             <Building className="h-12 w-12 text-gray-300 mx-auto mb-4" />
             <p>No properties available for trading.</p>
             <p className="text-sm mt-2">Property creators need to mint and approve tokens for sale first.</p>
+            <p className="text-xs mt-1 text-gray-400">Available tokens = Creator's token balance (0 if not minted yet)</p>
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -308,7 +386,12 @@ const Marketplace = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Available Tokens:</span>
-                      <span className="font-medium">{ethers.formatEther(marketInfo?.availableTokens || '0')}</span>
+                      <span className={`font-medium ${(marketInfo?.availableTokens || 0) > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                        {ethers.formatEther(marketInfo?.availableTokens || '0')}
+                        {(marketInfo?.availableTokens || 0) === 0 && (
+                          <span className="text-xs ml-1">(Not minted)</span>
+                        )}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Creator:</span>
@@ -319,9 +402,14 @@ const Marketplace = () => {
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     <button
                       onClick={() => setPurchaseForm({...purchaseForm, propertyId: property.id.toString()})}
-                      className="btn-primary w-full text-sm"
+                      disabled={(marketInfo?.availableTokens || 0) === 0}
+                      className={`w-full text-sm ${
+                        (marketInfo?.availableTokens || 0) === 0 
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed px-4 py-2 rounded-md' 
+                          : 'btn-primary'
+                      }`}
                     >
-                      Select for Purchase
+                      {(marketInfo?.availableTokens || 0) === 0 ? 'No Tokens Available' : 'Select for Purchase'}
                     </button>
                   </div>
                 </div>
