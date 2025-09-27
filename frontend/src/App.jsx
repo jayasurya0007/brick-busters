@@ -9,6 +9,7 @@ import PropertyCreatorDashboard from './pages/PropertyCreatorDashboard';
 import InvestorDashboard from './pages/InvestorDashboard';
 import PropertyDetails from './pages/PropertyDetails';
 import Marketplace from './components/Marketplace';
+import KYCVerification from './components/KYCVerification';
 import './App.css';
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
           <Layout>
             <Routes>
               <Route path="/" element={<Home />} />
+              <Route path="/kyc" element={<KYCVerification />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/creator" element={<PropertyCreatorDashboard />} />
               <Route path="/investor" element={<InvestorDashboard />} />

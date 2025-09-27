@@ -6,7 +6,6 @@ import toast from 'react-hot-toast';
 
 const AdminDashboard = () => {
   const { account, isConnected, contracts, isAdmin } = useWeb3();
-  const [walletAddress, setWalletAddress] = useState('');
   const [propertyForm, setPropertyForm] = useState({
     name: '',
     symbol: '',
@@ -18,11 +17,13 @@ const AdminDashboard = () => {
     totalTokens: ''
   });
   const [properties, setProperties] = useState([]);
+  const [pendingVerifications, setPendingVerifications] = useState([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isConnected && contracts.multiPropertyManager) {
       loadProperties();
+      loadPendingVerifications();
     }
   }, [isConnected, contracts]);
 
@@ -57,45 +58,49 @@ const AdminDashboard = () => {
     }
   };
 
-  const verifyWallet = async () => {
-    if (!walletAddress.trim()) {
-      toast.error('Please enter a wallet address');
-      return;
+  const loadPendingVerifications = async () => {
+    try {
+      if (!contracts.identityRegistry) return;
+      
+      // Note: This is a simplified approach. In a real implementation,
+      // you'd need to track verification requests through events or maintain a list
+      // For now, we'll show a placeholder message
+      setPendingVerifications([]);
+    } catch (error) {
+      console.error('Error loading pending verifications:', error);
     }
+  };
 
+  const approveVerification = async (walletAddress) => {
     try {
       setLoading(true);
-      const tx = await contracts.identityRegistry.verifyWallet(walletAddress);
+      const tx = await contracts.identityRegistry.approveVerification(walletAddress);
       await tx.wait();
-      toast.success('Wallet verified successfully');
-      setWalletAddress('');
+      toast.success('Verification approved successfully');
+      await loadPendingVerifications();
     } catch (error) {
-      console.error('Error verifying wallet:', error);
-      toast.error('Failed to verify wallet');
+      console.error('Error approving verification:', error);
+      toast.error('Failed to approve verification');
     } finally {
       setLoading(false);
     }
   };
 
-  const revokeWallet = async () => {
-    if (!walletAddress.trim()) {
-      toast.error('Please enter a wallet address');
-      return;
-    }
-
+  const rejectVerification = async (walletAddress) => {
     try {
       setLoading(true);
-      const tx = await contracts.identityRegistry.revokeWallet(walletAddress);
+      const tx = await contracts.identityRegistry.rejectVerification(walletAddress);
       await tx.wait();
-      toast.success('Wallet verification revoked');
-      setWalletAddress('');
+      toast.success('Verification rejected');
+      await loadPendingVerifications();
     } catch (error) {
-      console.error('Error revoking wallet:', error);
-      toast.error('Failed to revoke wallet');
+      console.error('Error rejecting verification:', error);
+      toast.error('Failed to reject verification');
     } finally {
       setLoading(false);
     }
   };
+
 
   const addProperty = async () => {
     if (!propertyForm.name || !propertyForm.symbol || !propertyForm.creator || !propertyForm.propertyValue || !propertyForm.totalTokens) {
@@ -211,51 +216,6 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* Wallet Management */}
-      <div className="card">
-        <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
-          <Shield className="h-5 w-5 mr-2" />
-          Wallet Management
-        </h2>
-        <div className="grid md:grid-cols-2 gap-6">
-          <div>
-            <label className="label">Wallet Address</label>
-            <input
-              type="text"
-              value={walletAddress}
-              onChange={(e) => setWalletAddress(e.target.value)}
-              placeholder="0x..."
-              className="input-field"
-            />
-            <div className="flex space-x-2 mt-4">
-              <button
-                onClick={verifyWallet}
-                disabled={loading}
-                className="btn-primary flex items-center space-x-2"
-              >
-                <CheckCircle className="h-4 w-4" />
-                <span>Verify Wallet</span>
-              </button>
-              <button
-                onClick={revokeWallet}
-                disabled={loading}
-                className="btn-danger flex items-center space-x-2"
-              >
-                <XCircle className="h-4 w-4" />
-                <span>Revoke Wallet</span>
-              </button>
-            </div>
-          </div>
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-medium text-gray-900 mb-2">Instructions</h3>
-            <ul className="text-sm text-gray-600 space-y-1">
-              <li>• Enter a wallet address to verify or revoke</li>
-              <li>• Verified wallets can participate in the platform</li>
-              <li>• Revoked wallets lose access to platform features</li>
-            </ul>
-          </div>
-        </div>
-      </div>
 
       {/* Add Property */}
       <div className="card">

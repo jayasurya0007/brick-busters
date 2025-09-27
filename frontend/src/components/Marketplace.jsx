@@ -79,15 +79,26 @@ const Marketplace = () => {
       for (const property of properties) {
         try {
           const marketInfo = await contracts.multiPropertyManager.getPropertyMarketData(property.id);
+          // Get creator's token balance to see how many tokens are available for sale
+          const creatorBalance = await property.tokenContract.balanceOf(property.creator);
+          
           data[property.id] = {
             propertyValue: marketInfo.propertyValue,
             totalTokens: marketInfo.totalTokens,
             tokenPrice: marketInfo.tokenPrice,
-            availableTokens: marketInfo.availableTokens,
+            availableTokens: creatorBalance, // Use creator's actual balance
             isActive: marketInfo.isActive
           };
         } catch (error) {
           console.error(`Error loading market data for property ${property.id}:`, error);
+          // Set default values if there's an error
+          data[property.id] = {
+            propertyValue: property.propertyValue,
+            totalTokens: property.totalTokens,
+            tokenPrice: property.tokenPrice,
+            availableTokens: 0,
+            isActive: property.isActive
+          };
         }
       }
       setMarketData(data);
@@ -119,12 +130,30 @@ const Marketplace = () => {
     const totalCost = marketInfo.tokenPrice * amount;
 
     if (marketInfo.availableTokens < amount) {
-      toast.error('Insufficient tokens available');
+      toast.error(`Insufficient tokens available. Only ${ethers.formatEther(marketInfo.availableTokens)} tokens available for purchase.`);
       return;
     }
 
     try {
       setLoading(true);
+      
+      // First, check if creator has approved the contract to transfer tokens
+      const tokenContract = new ethers.Contract(
+        property.tokenContract,
+        [
+          "function allowance(address owner, address spender) external view returns (uint256)",
+          "function approve(address spender, uint256 amount) external returns (bool)"
+        ],
+        contracts.multiPropertyManager.signer
+      );
+      
+      const allowance = await tokenContract.allowance(property.creator, contracts.multiPropertyManager.address);
+      
+      if (allowance < amount) {
+        toast.error('Creator has not approved enough tokens for sale. Please contact the property creator to mint and approve tokens.');
+        return;
+      }
+
       const tx = await contracts.multiPropertyManager.buyTokens(
         parseInt(purchaseForm.propertyId),
         amount,
@@ -140,8 +169,12 @@ const Marketplace = () => {
         toast.error('Insufficient payment for tokens');
       } else if (error.message.includes('Insufficient tokens available')) {
         toast.error('Not enough tokens available for purchase');
+      } else if (error.message.includes('Wallet not verified')) {
+        toast.error('Your wallet needs to be verified to buy tokens');
+      } else if (error.message.includes('Property not active')) {
+        toast.error('This property is not active for trading');
       } else {
-        toast.error('Failed to buy tokens');
+        toast.error(`Failed to buy tokens: ${error.message}`);
       }
     } finally {
       setLoading(false);
@@ -236,14 +269,20 @@ const Marketplace = () => {
 
       {/* Available Properties */}
       <div className="card">
-        <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
-          <Building className="h-5 w-5 mr-2" />
-          Available Properties ({activeProperties.length})
-        </h2>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+            <Building className="h-5 w-5 mr-2" />
+            Available Properties ({activeProperties.length})
+          </h2>
+          <div className="text-sm text-gray-500">
+            Properties with tokens available for purchase
+          </div>
+        </div>
         {activeProperties.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <Building className="h-12 w-12 text-gray-300 mx-auto mb-4" />
             <p>No properties available for trading.</p>
+            <p className="text-sm mt-2">Property creators need to mint and approve tokens for sale first.</p>
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">

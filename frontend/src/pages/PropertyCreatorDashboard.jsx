@@ -109,6 +109,56 @@ const PropertyCreatorDashboard = () => {
     }
   };
 
+  const prepareTokensForSale = async (propertyId) => {
+    const selectedProperty = properties.find(p => p.id === propertyId);
+    if (!selectedProperty) {
+      toast.error('Property not found');
+      return;
+    }
+
+    if (selectedProperty.creator.toLowerCase() !== account?.toLowerCase()) {
+      toast.error('You can only prepare tokens for properties you created');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Get the total tokens for this property
+      const property = await contracts.multiPropertyManager.properties(propertyId);
+      const totalTokens = property.totalTokens;
+      
+      // Mint all tokens to the creator
+      const mintTx = await contracts.multiPropertyManager.mintTokens(
+        propertyId,
+        account,
+        totalTokens
+      );
+      await mintTx.wait();
+      
+      // Approve the contract to transfer tokens for trading
+      const tokenContract = new ethers.Contract(
+        selectedProperty.tokenContract,
+        [
+          "function approve(address spender, uint256 amount) external returns (bool)",
+          "function allowance(address owner, address spender) external view returns (uint256)"
+        ],
+        contracts.multiPropertyManager.signer
+      );
+      
+      const approveTx = await tokenContract.approve(contracts.multiPropertyManager.address, totalTokens);
+      await approveTx.wait();
+      
+      toast.success('Tokens minted and approved for trading successfully');
+      await loadProperties(); // Refresh properties
+    } catch (error) {
+      console.error('Error preparing tokens for sale:', error);
+      toast.error('Failed to prepare tokens for sale');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getMyProperties = () => {
     return properties.filter(property => 
       property.creator.toLowerCase() === account?.toLowerCase()
@@ -236,11 +286,15 @@ const PropertyCreatorDashboard = () => {
                   <div>Token Contract: {property.tokenContract.slice(0, 6)}...{property.tokenContract.slice(-4)}</div>
                 </div>
                 <div className="flex space-x-2">
-                  <button className="btn-primary text-sm flex-1">
-                    View Details
+                  <button 
+                    onClick={() => prepareTokensForSale(property.id)}
+                    disabled={loading}
+                    className="btn-primary text-sm flex-1"
+                  >
+                    {loading ? 'Preparing...' : 'Prepare for Sale'}
                   </button>
                   <button className="btn-secondary text-sm flex-1">
-                    Manage
+                    View Details
                   </button>
                 </div>
               </div>

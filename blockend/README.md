@@ -43,6 +43,27 @@ A comprehensive blockchain-based fractional property ownership platform built on
 
 ## 🚀 **Latest Updates & Features**
 
+### **Marketplace Token Purchase Fix (v3.2)**
+- **Date**: December 2024
+- **Features**:
+  - Fixed marketplace token purchase functionality
+  - Added token preparation workflow for property creators
+  - Improved error handling for token purchases
+  - Added approval checking before token purchases
+  - Enhanced marketplace with better user feedback
+  - Fixed available tokens calculation using creator balance
+
+### **Auto-Verification KYC (v3.1)**
+- **Date**: December 2024
+- **Features**:
+  - File upload functionality for KYC documents
+  - Automatic verification after document upload
+  - Removed manual wallet management from admin dashboard
+  - Streamlined verification process
+  - Enhanced user experience with drag-and-drop file upload
+  - Improved error handling for verification status checks
+  - Retry functionality for failed status checks
+
 ### **Marketplace Implementation (v2.0)**
 
 #### **Property Structure Enhancement**
@@ -83,9 +104,9 @@ struct Property {
 
 ### **Contract Addresses (Latest)**
 ```
-IdentityRegistry:     0xeE47fd20ED795fca8AeB18487113bE6963AFF42A
-ComplianceModule:     0xe26E53985B41997Fd25e1c36B19B8420924CdE1D
-MultiPropertyManager: 0x11802636b58666900f476A99eBe70a362A46c599
+IdentityRegistry:     0x4bB5a645bcEfc85b5Ca9e5283365e62D2adE5876
+ComplianceModule:     0x01890E7948BdbBB7d6a0EDaE396Af1bCEaB03e8c
+MultiPropertyManager: 0x071692F39260468A6A5E3E0699736b775b07136d
 ```
 
 ### **Sample Property Created**

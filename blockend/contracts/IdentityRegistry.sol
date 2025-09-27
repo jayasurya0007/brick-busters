@@ -9,22 +9,89 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 /// @title Identity Registry for KYC/AML verification
 contract IdentityRegistry is Ownable {
     mapping(address => bool) private verifiedWallets;
+    mapping(address => bool) private pendingVerifications;
+    mapping(address => string) private kycDocuments;
+    mapping(address => uint256) private verificationTimestamp;
 
     event WalletVerified(address indexed wallet);
     event WalletRevoked(address indexed wallet);
+    event VerificationRequested(address indexed wallet, string kycDocument);
+    event VerificationApproved(address indexed wallet);
+    event VerificationRejected(address indexed wallet);
 
+    // Admin functions
     function verifyWallet(address wallet) external onlyOwner {
         verifiedWallets[wallet] = true;
+        pendingVerifications[wallet] = false;
+        verificationTimestamp[wallet] = block.timestamp;
         emit WalletVerified(wallet);
     }
 
     function revokeWallet(address wallet) external onlyOwner {
         verifiedWallets[wallet] = false;
+        pendingVerifications[wallet] = false;
         emit WalletRevoked(wallet);
     }
 
+    // Self-service KYC functions
+    function requestVerification(string memory kycDocument) external {
+        require(!verifiedWallets[msg.sender], "Wallet already verified");
+        require(!pendingVerifications[msg.sender], "Verification already pending");
+        require(bytes(kycDocument).length > 0, "KYC document required");
+        
+        // Auto-verify after document upload
+        verifiedWallets[msg.sender] = true;
+        pendingVerifications[msg.sender] = false;
+        kycDocuments[msg.sender] = kycDocument;
+        verificationTimestamp[msg.sender] = block.timestamp;
+        emit VerificationRequested(msg.sender, kycDocument);
+        emit WalletVerified(msg.sender);
+    }
+
+    function approveVerification(address wallet) external onlyOwner {
+        require(pendingVerifications[wallet], "No pending verification");
+        verifiedWallets[wallet] = true;
+        pendingVerifications[wallet] = false;
+        verificationTimestamp[wallet] = block.timestamp;
+        emit VerificationApproved(wallet);
+    }
+
+    function rejectVerification(address wallet) external onlyOwner {
+        require(pendingVerifications[wallet], "No pending verification");
+        pendingVerifications[wallet] = false;
+        delete kycDocuments[wallet];
+        emit VerificationRejected(wallet);
+    }
+
+    // View functions
     function isVerified(address wallet) external view returns (bool) {
         return verifiedWallets[wallet];
+    }
+
+    function isPendingVerification(address wallet) external view returns (bool) {
+        return pendingVerifications[wallet];
+    }
+
+    function getKycDocument(address wallet) external view returns (string memory) {
+        return kycDocuments[wallet];
+    }
+
+    function getVerificationTimestamp(address wallet) external view returns (uint256) {
+        return verificationTimestamp[wallet];
+    }
+
+    function getVerificationStatus(address wallet) external view returns (
+        bool verified,
+        bool pending,
+        string memory kycDoc,
+        uint256 timestamp
+    ) {
+        return (
+            verifiedWallets[wallet],
+            pendingVerifications[wallet],
+            kycDocuments[wallet],
+            verificationTimestamp[wallet]
+        );
     }
 }
 

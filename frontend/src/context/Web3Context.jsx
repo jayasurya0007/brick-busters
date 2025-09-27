@@ -110,7 +110,14 @@ export const Web3Provider = ({ children }) => {
         [
           "function verifyWallet(address wallet) external",
           "function revokeWallet(address wallet) external", 
+          "function requestVerification(string memory kycDocument) external",
+          "function approveVerification(address wallet) external",
+          "function rejectVerification(address wallet) external",
           "function isVerified(address wallet) external view returns (bool)",
+          "function isPendingVerification(address wallet) external view returns (bool)",
+          "function getKycDocument(address wallet) external view returns (string memory)",
+          "function getVerificationTimestamp(address wallet) external view returns (uint256)",
+          "function getVerificationStatus(address wallet) external view returns (bool verified, bool pending, string memory kycDoc, uint256 timestamp)",
           "function owner() external view returns (address)"
         ],
         signer

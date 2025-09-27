@@ -11,6 +11,7 @@ const Layout = ({ children }) => {
 
   const navigation = [
     { name: 'Home', href: '/', icon: Home },
+    { name: 'KYC', href: '/kyc', icon: Shield },
     { name: 'Marketplace', href: '/marketplace', icon: Building },
     { name: 'Admin', href: '/admin', icon: Shield, adminOnly: true },
     { name: 'Creator', href: '/creator', icon: Building },

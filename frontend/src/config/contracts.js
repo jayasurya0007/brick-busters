@@ -1,9 +1,9 @@
 // Contract addresses from your deployment on Citrea testnet (Chain ID 5115)
 export const CONTRACT_ADDRESSES = {
-  // Updated with latest deployment addresses with marketplace functionality
-  IDENTITY_REGISTRY: "0xeE47fd20ED795fca8AeB18487113bE6963AFF42A",
-  COMPLIANCE_MODULE: "0xe26E53985B41997Fd25e1c36B19B8420924CdE1D",
-  MULTI_PROPERTY_MANAGER: "0x11802636b58666900f476A99eBe70a362A46c599"
+  // Updated with latest deployment addresses with auto-verification KYC functionality
+  IDENTITY_REGISTRY: "0x4bB5a645bcEfc85b5Ca9e5283365e62D2adE5876",
+  COMPLIANCE_MODULE: "0x01890E7948BdbBB7d6a0EDaE396Af1bCEaB03e8c",
+  MULTI_PROPERTY_MANAGER: "0x071692F39260468A6A5E3E0699736b775b07136d"
 };
 
 // Network configuration - Updated to match your deployed contracts
@@ -36,9 +36,20 @@ export const FALLBACK_NETWORK_CONFIG = {
 export const IDENTITY_REGISTRY_ABI = [
   "function verifyWallet(address wallet) external",
   "function revokeWallet(address wallet) external", 
+  "function requestVerification(string memory kycDocument) external",
+  "function approveVerification(address wallet) external",
+  "function rejectVerification(address wallet) external",
   "function isVerified(address wallet) external view returns (bool)",
+  "function isPendingVerification(address wallet) external view returns (bool)",
+  "function getKycDocument(address wallet) external view returns (string memory)",
+  "function getVerificationTimestamp(address wallet) external view returns (uint256)",
+  "function getVerificationStatus(address wallet) external view returns (bool verified, bool pending, string memory kycDoc, uint256 timestamp)",
+  "function owner() external view returns (address)",
   "event WalletVerified(address indexed wallet)",
-  "event WalletRevoked(address indexed wallet)"
+  "event WalletRevoked(address indexed wallet)",
+  "event VerificationRequested(address indexed wallet, string kycDocument)",
+  "event VerificationApproved(address indexed wallet)",
+  "event VerificationRejected(address indexed wallet)"
 ];
 
 export const COMPLIANCE_MODULE_ABI = [
