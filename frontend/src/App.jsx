@@ -10,7 +10,7 @@ import InvestorDashboard from './pages/InvestorDashboard';
 import PropertyDetails from './pages/PropertyDetails';
 import Marketplace from './components/Marketplace';
 import KYCVerification from './components/KYCVerification';
-import './App.css';
+// import './App.css';
 
 function App() {
   return (
