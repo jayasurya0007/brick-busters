@@ -51,7 +51,6 @@ const AdminDashboard = () => {
       setProperties(propertyList);
     } catch (error) {
       console.error('Error loading properties:', error);
-      toast.error('Failed to load properties');
     }
   };
 

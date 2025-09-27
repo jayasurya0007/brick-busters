@@ -2,10 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useWeb3 } from '../context/Web3Context';
 import { Building, Shield, Users, TrendingUp, CheckCircle, AlertCircle } from 'lucide-react';
-import SimpleNetworkStatus from '../components/SimpleNetworkStatus';
-import DebugInfo from '../components/DebugInfo';
-import ContractTester from '../components/ContractTester';
-import ContractVerifier from '../components/ContractVerifier';
 import NetworkSwitcher from '../components/NetworkSwitcher';
 import toast from 'react-hot-toast';
 
@@ -42,7 +38,6 @@ const Home = () => {
       await loadProperties();
     } catch (error) {
       console.error('Error loading data:', error);
-      toast.error('Failed to load data');
     } finally {
       setLoading(false);
     }
@@ -113,27 +108,80 @@ const Home = () => {
     return cards;
   };
 
-  if (loading) {
+  // Show welcome screen when not connected instead of loading
+  if (!isConnected) {
     return (
-      <div className="flex items-center justify-center min-h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      <div className="space-y-8">
+        {/* Hero Section */}
+        <div className="text-center">
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+            Welcome to PropertyToken
+          </h1>
+          <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+            Invest in real estate properties through blockchain-based fractional ownership tokens. 
+            Earn revenue from property investments with full transparency and compliance.
+          </p>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-md mx-auto">
+            <div className="flex items-center justify-center mb-4">
+              <Building className="h-12 w-12 text-blue-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-blue-900 mb-2">Get Started</h3>
+            <p className="text-blue-800 mb-4">
+              Connect your MetaMask wallet to access the platform and start investing in fractional property ownership.
+            </p>
+            <button
+              onClick={connectWallet}
+              className="btn-primary w-full"
+            >
+              Connect Wallet
+            </button>
+          </div>
+        </div>
+
+        {/* Features Section */}
+        <div className="bg-white rounded-lg shadow-md p-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Platform Features</h2>
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="text-center">
+              <div className="bg-blue-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                <Shield className="h-8 w-8 text-blue-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">KYC/AML Compliance</h3>
+              <p className="text-gray-600">All participants must be verified through our identity registry</p>
+            </div>
+            <div className="text-center">
+              <div className="bg-green-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                <TrendingUp className="h-8 w-8 text-green-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Revenue Distribution</h3>
+              <p className="text-gray-600">Automatic revenue sharing based on token holdings</p>
+            </div>
+            <div className="text-center">
+              <div className="bg-purple-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                <Building className="h-8 w-8 text-purple-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Property Management</h3>
+              <p className="text-gray-600">Comprehensive property documentation and token management</p>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-8">
-      {/* Debug Information */}
-      <DebugInfo />
-
-      {/* Contract Tester */}
-      <ContractTester />
-
-      {/* Contract Verifier */}
-      <ContractVerifier />
-
       {/* Network Switcher */}
       <NetworkSwitcher />
+
+      {/* Loading State for Connected Users */}
+      {loading && (
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your data...</p>
+        </div>
+      )}
 
       {/* Hero Section */}
       <div className="text-center">
@@ -174,7 +222,7 @@ const Home = () => {
       </div>
 
       {/* Role Selection */}
-      {isConnected && (
+      {isConnected && !loading && (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {getRoleCards().map((role) => {
             const Icon = role.icon;
@@ -211,7 +259,7 @@ const Home = () => {
       )}
 
       {/* Properties Section */}
-      {properties.length > 0 && (
+      {!loading && properties.length > 0 && (
         <div>
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Available Properties</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">

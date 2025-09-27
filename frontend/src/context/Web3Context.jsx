@@ -60,7 +60,6 @@ export const Web3Provider = ({ children }) => {
       // Check if we're on the correct network
       const correctChainId = parseInt(NETWORK_CONFIG.chainId, 16);
       if (network.chainId !== BigInt(correctChainId)) {
-        console.log(`Wrong network. Current: ${network.chainId}, Expected: ${correctChainId}`);
         await switchToCorrectNetwork();
       }
 
@@ -79,29 +78,21 @@ export const Web3Provider = ({ children }) => {
   // Switch to correct network with fallback
   const switchToCorrectNetwork = async () => {
     try {
-      console.log('Attempting to switch to Citrea testnet...');
       await window.ethereum.request({
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: NETWORK_CONFIG.chainId }],
       });
-      console.log('Successfully switched to Citrea testnet');
     } catch (switchError) {
-      console.log('Citrea network not available, trying to add it...', switchError);
-      
       // If the network doesn't exist, add it
       if (switchError.code === 4902) {
         try {
-          console.log('Adding Citrea network...');
           await window.ethereum.request({
             method: 'wallet_addEthereumChain',
             params: [NETWORK_CONFIG],
           });
-          console.log('Successfully added Citrea network');
         } catch (addError) {
           console.error('Error adding Citrea network:', addError);
           toast.error('Failed to add Citrea network. Please add it manually in MetaMask.');
-          
-          // Show manual instructions
           toast.error('Please manually add Citrea testnet: Chain ID 5115, RPC: https://rpc.testnet.citrea.xyz');
         }
       } else {
