@@ -3,9 +3,12 @@ import { useWeb3 } from '../context/Web3Context';
 import { Shield, Building, Users, Plus, Pause, Play, CheckCircle, XCircle } from 'lucide-react';
 import { ethers } from 'ethers';
 import toast from 'react-hot-toast';
+import WalrusFileUpload from '../components/WalrusFileUpload';
+import { useWalrus } from '../hooks/useWalrus';
 
 const AdminDashboard = () => {
   const { account, isConnected, contracts, isAdmin } = useWeb3();
+  const { generateDocumentHash } = useWalrus();
   const [propertyForm, setPropertyForm] = useState({
     name: '',
     symbol: '',
@@ -16,39 +19,102 @@ const AdminDashboard = () => {
     propertyValue: '',
     totalTokens: ''
   });
+  const [uploadedDocuments, setUploadedDocuments] = useState({
+    deed: null,
+    appraisal: null,
+    kyc: null
+  });
   const [properties, setProperties] = useState([]);
   const [pendingVerifications, setPendingVerifications] = useState([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isConnected && contracts.multiPropertyManager) {
-      loadProperties();
-      loadPendingVerifications();
+      // Add a small delay to ensure contract is fully initialized
+      const timer = setTimeout(() => {
+        loadProperties();
+        loadPendingVerifications();
+      }, 100);
+      
+      return () => clearTimeout(timer);
     }
   }, [isConnected, contracts]);
 
   const loadProperties = async () => {
     try {
-      if (!contracts.multiPropertyManager) return;
+      if (!contracts.multiPropertyManager) {
+        console.error('MultiPropertyManager contract not available');
+        return;
+      }
 
-      const nextId = await contracts.multiPropertyManager.nextPropertyId();
+      // Validate contract has required methods
+      if (typeof contracts.multiPropertyManager.nextPropertyId !== 'function') {
+        console.error('Contract missing nextPropertyId function. Contract object:', contracts.multiPropertyManager);
+        console.error('Available methods:', Object.getOwnPropertyNames(contracts.multiPropertyManager));
+        return;
+      }
+
+      console.log('Loading properties...', {
+        contract: !!contracts.multiPropertyManager,
+        nextPropertyId: typeof contracts.multiPropertyManager.nextPropertyId
+      });
+
+      let nextId;
+      try {
+        nextId = await contracts.multiPropertyManager.nextPropertyId();
+        console.log('Next property ID:', nextId.toString());
+      } catch (error) {
+        console.error('Error calling nextPropertyId:', error);
+        // Fallback: try to get properties by checking individual IDs
+        console.log('Trying fallback method...');
+        nextId = 1; // Start with 1 and try to find properties
+      }
+      
       const propertyList = [];
 
-      for (let i = 1; i < nextId; i++) {
-        try {
-          const property = await contracts.multiPropertyManager.properties(i);
-          propertyList.push({
-            id: i,
-            name: property.name,
-            symbol: property.symbol,
-            creator: property.creator,
-            tokenContract: property.tokenContract,
-            deedHash: property.deedHash,
-            appraisalHash: property.appraisalHash,
-            kycDocHash: property.kycDocHash
-          });
-        } catch (error) {
-          console.error(`Error loading property ${i}:`, error);
+      // If nextPropertyId failed, try to find properties by checking individual IDs
+      if (nextId === 1) {
+        console.log('Using fallback method to find properties...');
+        let foundProperties = 0;
+        for (let i = 1; i <= 10; i++) { // Check up to 10 properties
+          try {
+            const property = await contracts.multiPropertyManager.properties(i);
+            if (property.name && property.name !== '') {
+              propertyList.push({
+                id: i,
+                name: property.name,
+                symbol: property.symbol,
+                creator: property.creator,
+                tokenContract: property.tokenContract,
+                deedHash: property.deedHash,
+                appraisalHash: property.appraisalHash,
+                kycDocHash: property.kycDocHash
+              });
+              foundProperties++;
+            }
+          } catch (error) {
+            // Property doesn't exist, continue
+            if (foundProperties === 0 && i > 3) break; // Stop if no properties found after checking a few
+          }
+        }
+      } else {
+        // Normal flow with nextPropertyId
+        for (let i = 1; i < nextId; i++) {
+          try {
+            const property = await contracts.multiPropertyManager.properties(i);
+            propertyList.push({
+              id: i,
+              name: property.name,
+              symbol: property.symbol,
+              creator: property.creator,
+              tokenContract: property.tokenContract,
+              deedHash: property.deedHash,
+              appraisalHash: property.appraisalHash,
+              kycDocHash: property.kycDocHash
+            });
+          } catch (error) {
+            console.error(`Error loading property ${i}:`, error);
+          }
         }
       }
 
@@ -101,6 +167,28 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleDocumentUpload = (documentType, uploadedFile) => {
+    const hash = generateDocumentHash({ 
+      name: uploadedFile.originalName, 
+      size: uploadedFile.size 
+    });
+    
+    setUploadedDocuments(prev => ({
+      ...prev,
+      [documentType]: {
+        ...uploadedFile,
+        hash: hash
+      }
+    }));
+
+    // Update the form with the hash
+    setPropertyForm(prev => ({
+      ...prev,
+      [`${documentType}Hash`]: hash
+    }));
+
+    toast.success(`${documentType} document uploaded successfully!`);
+  };
 
   const addProperty = async () => {
     if (!propertyForm.name || !propertyForm.symbol || !propertyForm.creator || !propertyForm.propertyValue || !propertyForm.totalTokens) {
@@ -132,7 +220,12 @@ const AdminDashboard = () => {
         propertyValue: '',
         totalTokens: ''
       });
-      loadProperties();
+      setUploadedDocuments({
+        deed: null,
+        appraisal: null,
+        kyc: null
+      });
+      await loadProperties();
     } catch (error) {
       console.error('Error adding property:', error);
       toast.error('Failed to add property');
@@ -274,35 +367,59 @@ const AdminDashboard = () => {
               className="input-field"
             />
           </div>
-          <div>
-            <label className="label">Deed Hash</label>
-            <input
-              type="text"
-              value={propertyForm.deedHash}
-              onChange={(e) => setPropertyForm({...propertyForm, deedHash: e.target.value})}
-              placeholder="Optional: IPFS hash or document hash"
-              className="input-field"
+          <div className="md:col-span-2">
+            <label className="label">Property Deed Document</label>
+            <WalrusFileUpload
+              onUploadComplete={(file) => handleDocumentUpload('deed', file)}
+              documentType="deed"
+              propertyId="new"
+              maxFiles={1}
+              allowedTypes={['application/pdf', 'image/jpeg', 'image/png', 'image/jpg']}
+              maxSize={10 * 1024 * 1024} // 10MB
             />
+            {uploadedDocuments.deed && (
+              <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-md">
+                <p className="text-sm text-green-800">
+                  ✅ Deed uploaded: {uploadedDocuments.deed.originalName}
+                </p>
+              </div>
+            )}
           </div>
-          <div>
-            <label className="label">Appraisal Hash</label>
-            <input
-              type="text"
-              value={propertyForm.appraisalHash}
-              onChange={(e) => setPropertyForm({...propertyForm, appraisalHash: e.target.value})}
-              placeholder="Optional: Appraisal document hash"
-              className="input-field"
+          <div className="md:col-span-2">
+            <label className="label">Property Appraisal Document</label>
+            <WalrusFileUpload
+              onUploadComplete={(file) => handleDocumentUpload('appraisal', file)}
+              documentType="appraisal"
+              propertyId="new"
+              maxFiles={1}
+              allowedTypes={['application/pdf', 'image/jpeg', 'image/png', 'image/jpg']}
+              maxSize={10 * 1024 * 1024} // 10MB
             />
+            {uploadedDocuments.appraisal && (
+              <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-md">
+                <p className="text-sm text-green-800">
+                  ✅ Appraisal uploaded: {uploadedDocuments.appraisal.originalName}
+                </p>
+              </div>
+            )}
           </div>
-          <div>
-            <label className="label">KYC Document Hash</label>
-            <input
-              type="text"
-              value={propertyForm.kycDocHash}
-              onChange={(e) => setPropertyForm({...propertyForm, kycDocHash: e.target.value})}
-              placeholder="Optional: KYC document hash"
-              className="input-field"
+          <div className="md:col-span-2">
+            <label className="label">KYC Document</label>
+            <WalrusFileUpload
+              onUploadComplete={(file) => handleDocumentUpload('kyc', file)}
+              documentType="kyc"
+              propertyId="new"
+              maxFiles={1}
+              allowedTypes={['application/pdf', 'image/jpeg', 'image/png', 'image/jpg']}
+              maxSize={10 * 1024 * 1024} // 10MB
             />
+            {uploadedDocuments.kyc && (
+              <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-md">
+                <p className="text-sm text-green-800">
+                  ✅ KYC document uploaded: {uploadedDocuments.kyc.originalName}
+                </p>
+              </div>
+            )}
           </div>
         </div>
         <div className="mt-6">

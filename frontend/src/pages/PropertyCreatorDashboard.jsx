@@ -17,7 +17,12 @@ const PropertyCreatorDashboard = () => {
 
   useEffect(() => {
     if (isConnected && contracts.multiPropertyManager) {
-      loadData();
+      // Add a small delay to ensure contract is fully initialized
+      const timer = setTimeout(() => {
+        loadData();
+      }, 100);
+      
+      return () => clearTimeout(timer);
     }
   }, [isConnected, contracts]);
 
@@ -39,26 +44,79 @@ const PropertyCreatorDashboard = () => {
 
   const loadProperties = async () => {
     try {
-      if (!contracts.multiPropertyManager) return;
+      if (!contracts.multiPropertyManager) {
+        console.error('MultiPropertyManager contract not available');
+        return;
+      }
 
-      const nextId = await contracts.multiPropertyManager.nextPropertyId();
+      // Validate contract has required methods
+      if (typeof contracts.multiPropertyManager.nextPropertyId !== 'function') {
+        console.error('Contract missing nextPropertyId function. Contract object:', contracts.multiPropertyManager);
+        console.error('Available methods:', Object.getOwnPropertyNames(contracts.multiPropertyManager));
+        return;
+      }
+
+      console.log('Loading properties...', {
+        contract: !!contracts.multiPropertyManager,
+        nextPropertyId: typeof contracts.multiPropertyManager.nextPropertyId
+      });
+
+      let nextId;
+      try {
+        nextId = await contracts.multiPropertyManager.nextPropertyId();
+        console.log('Next property ID:', nextId.toString());
+      } catch (error) {
+        console.error('Error calling nextPropertyId:', error);
+        // Fallback: try to get properties by checking individual IDs
+        console.log('Trying fallback method...');
+        nextId = 1; // Start with 1 and try to find properties
+      }
+      
       const propertyList = [];
 
-      for (let i = 1; i < nextId; i++) {
-        try {
-          const property = await contracts.multiPropertyManager.properties(i);
-          propertyList.push({
-            id: i,
-            name: property.name,
-            symbol: property.symbol,
-            creator: property.creator,
-            tokenContract: property.tokenContract,
-            deedHash: property.deedHash,
-            appraisalHash: property.appraisalHash,
-            kycDocHash: property.kycDocHash
-          });
-        } catch (error) {
-          console.error(`Error loading property ${i}:`, error);
+      // If nextPropertyId failed, try to find properties by checking individual IDs
+      if (nextId === 1) {
+        console.log('Using fallback method to find properties...');
+        let foundProperties = 0;
+        for (let i = 1; i <= 10; i++) { // Check up to 10 properties
+          try {
+            const property = await contracts.multiPropertyManager.properties(i);
+            if (property.name && property.name !== '') {
+              propertyList.push({
+                id: i,
+                name: property.name,
+                symbol: property.symbol,
+                creator: property.creator,
+                tokenContract: property.tokenContract,
+                deedHash: property.deedHash,
+                appraisalHash: property.appraisalHash,
+                kycDocHash: property.kycDocHash
+              });
+              foundProperties++;
+            }
+          } catch (error) {
+            // Property doesn't exist, continue
+            if (foundProperties === 0 && i > 3) break; // Stop if no properties found after checking a few
+          }
+        }
+      } else {
+        // Normal flow with nextPropertyId
+        for (let i = 1; i < nextId; i++) {
+          try {
+            const property = await contracts.multiPropertyManager.properties(i);
+            propertyList.push({
+              id: i,
+              name: property.name,
+              symbol: property.symbol,
+              creator: property.creator,
+              tokenContract: property.tokenContract,
+              deedHash: property.deedHash,
+              appraisalHash: property.appraisalHash,
+              kycDocHash: property.kycDocHash
+            });
+          } catch (error) {
+            console.error(`Error loading property ${i}:`, error);
+          }
         }
       }
 

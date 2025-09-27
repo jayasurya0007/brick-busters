@@ -3,12 +3,16 @@ import { useWeb3 } from '../context/Web3Context';
 import { Shield, CheckCircle, Clock, AlertCircle, Upload, FileText } from 'lucide-react';
 import { ethers } from 'ethers';
 import toast from 'react-hot-toast';
+import WalrusFileUpload from './WalrusFileUpload';
+import { useWalrus } from '../hooks/useWalrus';
 
 const KYCVerification = () => {
   const { account, isConnected, contracts } = useWeb3();
+  const { generateDocumentHash } = useWalrus();
   const [kycDocument, setKycDocument] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileHash, setFileHash] = useState('');
+  const [uploadedFileInfo, setUploadedFileInfo] = useState(null);
   const [verificationStatus, setVerificationStatus] = useState({
     verified: false,
     pending: false,
@@ -76,17 +80,34 @@ const KYCVerification = () => {
     }
   };
 
+  const handleWalrusUpload = (uploadedFile) => {
+    setUploadedFileInfo(uploadedFile);
+    const hash = generateDocumentHash({ name: uploadedFile.originalName, size: uploadedFile.size });
+    setFileHash(hash);
+    setKycDocument(`Walrus File: ${uploadedFile.originalName} | Upload ID: ${uploadedFile.id} | Hash: ${hash}`);
+    toast.success('Document uploaded to Walrus successfully!');
+  };
+
   const requestVerification = async () => {
-    if (!kycDocument.trim() && !selectedFile) {
+    if (!kycDocument.trim() && !selectedFile && !uploadedFileInfo) {
       toast.error('Please upload a KYC document or provide a document reference');
       return;
     }
 
     try {
       setLoading(true);
-      const documentRef = selectedFile ? 
-        `File: ${selectedFile.name} | Hash: ${fileHash} | Size: ${selectedFile.size} bytes` : 
-        kycDocument;
+      let documentRef;
+      
+      if (uploadedFileInfo) {
+        // Use Walrus file information
+        documentRef = `Walrus File: ${uploadedFileInfo.originalName} | Upload ID: ${uploadedFileInfo.id} | Hash: ${fileHash} | Size: ${uploadedFileInfo.size} bytes | URL: ${uploadedFileInfo.url}`;
+      } else if (selectedFile) {
+        // Use local file information
+        documentRef = `File: ${selectedFile.name} | Hash: ${fileHash} | Size: ${selectedFile.size} bytes`;
+      } else {
+        // Use manual document reference
+        documentRef = kycDocument;
+      }
       
       const tx = await contracts.identityRegistry.requestVerification(documentRef);
       await tx.wait();
@@ -94,6 +115,7 @@ const KYCVerification = () => {
       setKycDocument('');
       setSelectedFile(null);
       setFileHash('');
+      setUploadedFileInfo(null);
       setStatusError(false);
       await checkVerificationStatus();
     } catch (error) {
@@ -245,37 +267,26 @@ const KYCVerification = () => {
           
           <div className="space-y-6">
             <div>
-              <label className="label">Upload KYC Document</label>
-              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-gray-400 transition-colors">
-                <div className="space-y-1 text-center">
-                  <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                  <div className="flex text-sm text-gray-600">
-                    <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500">
-                      <span>Upload a file</span>
-                      <input
-                        id="file-upload"
-                        name="file-upload"
-                        type="file"
-                        className="sr-only"
-                        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                        onChange={handleFileUpload}
-                      />
-                    </label>
-                    <p className="pl-1">or drag and drop</p>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    PDF, JPG, PNG, DOC up to 10MB
-                  </p>
-                </div>
-              </div>
-              {selectedFile && (
+              <label className="label">Upload KYC Document to Walrus</label>
+              <WalrusFileUpload
+                onUploadComplete={handleWalrusUpload}
+                documentType="kyc"
+                userId={account}
+                maxFiles={1}
+                allowedTypes={['application/pdf', 'image/jpeg', 'image/png', 'image/jpg']}
+                maxSize={10 * 1024 * 1024} // 10MB
+              />
+              {uploadedFileInfo && (
                 <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
                   <div className="flex items-center">
                     <FileText className="h-5 w-5 text-green-600 mr-2" />
                     <div>
-                      <p className="text-sm font-medium text-green-800">{selectedFile.name}</p>
+                      <p className="text-sm font-medium text-green-800">{uploadedFileInfo.originalName}</p>
                       <p className="text-xs text-green-600">
-                        {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                        {(uploadedFileInfo.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                      <p className="text-xs text-green-600">
+                        Walrus ID: {uploadedFileInfo.id}
                       </p>
                     </div>
                   </div>

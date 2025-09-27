@@ -154,16 +154,51 @@ export const Web3Provider = ({ children }) => {
         signer
       );
 
+      // Create a wrapper object that preserves all contract methods and adds new properties
+      const enhancedMultiPropertyManager = new Proxy(multiPropertyManager, {
+        get(target, prop) {
+          // Return custom properties first
+          if (prop === 'runner') return provider;
+          if (prop === 'signer') return signer;
+          if (prop === 'provider') return provider;
+          
+          // Return original contract properties
+          return target[prop];
+        }
+      });
+
       setContracts({
         identityRegistry,
         complianceModule,
-        multiPropertyManager: {
-          ...multiPropertyManager,
-          runner: provider, // Add runner for read-only calls
-          signer: signer,   // Keep signer for write operations
-          provider: provider // Add provider for mixed operations
-        }
+        multiPropertyManager: enhancedMultiPropertyManager
       });
+
+      // Debug: Check if contract functions are available
+      console.log('Contract initialized:', {
+        multiPropertyManager: !!multiPropertyManager,
+        nextPropertyId: typeof multiPropertyManager.nextPropertyId,
+        address: CONTRACT_ADDRESSES.MULTI_PROPERTY_MANAGER
+      });
+
+      // Test contract functions
+      try {
+        const testResult = await multiPropertyManager.nextPropertyId();
+        console.log('✅ Contract test successful, nextPropertyId:', testResult.toString());
+        
+        // Test the enhanced contract
+        const enhancedTestResult = await enhancedMultiPropertyManager.nextPropertyId();
+        console.log('✅ Enhanced contract test successful, nextPropertyId:', enhancedTestResult.toString());
+        console.log('✅ Enhanced contract runner:', !!enhancedMultiPropertyManager.runner);
+        console.log('✅ Enhanced contract signer:', !!enhancedMultiPropertyManager.signer);
+      } catch (error) {
+        console.error('❌ Contract test failed:', error);
+        console.log('Contract details:', {
+          target: multiPropertyManager.target,
+          interface: multiPropertyManager.interface,
+          runner: !!multiPropertyManager.runner,
+          signer: !!multiPropertyManager.signer
+        });
+      }
     } catch (error) {
       console.error('Error initializing contracts:', error);
       toast.error('Failed to initialize contracts');

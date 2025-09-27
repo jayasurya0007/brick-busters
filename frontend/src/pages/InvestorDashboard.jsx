@@ -14,7 +14,12 @@ const InvestorDashboard = () => {
 
   useEffect(() => {
     if (isConnected && contracts.multiPropertyManager) {
-      loadData();
+      // Add a small delay to ensure contract is fully initialized
+      const timer = setTimeout(() => {
+        loadData();
+      }, 100);
+      
+      return () => clearTimeout(timer);
     }
   }, [isConnected, contracts]);
 
@@ -38,26 +43,80 @@ const InvestorDashboard = () => {
 
   const loadProperties = async () => {
     try {
-      if (!contracts.multiPropertyManager) return;
+      if (!contracts.multiPropertyManager) {
+        console.error('MultiPropertyManager contract not available');
+        return;
+      }
 
-      const nextId = await contracts.multiPropertyManager.nextPropertyId();
+      // Validate contract has required methods
+      if (typeof contracts.multiPropertyManager.nextPropertyId !== 'function') {
+        console.error('Contract missing nextPropertyId function. Contract object:', contracts.multiPropertyManager);
+        console.error('Available methods:', Object.getOwnPropertyNames(contracts.multiPropertyManager));
+        return;
+      }
+
+      console.log('Loading properties...', {
+        contract: !!contracts.multiPropertyManager,
+        nextPropertyId: typeof contracts.multiPropertyManager.nextPropertyId,
+        contractMethods: Object.getOwnPropertyNames(contracts.multiPropertyManager).filter(name => typeof contracts.multiPropertyManager[name] === 'function')
+      });
+
+      let nextId;
+      try {
+        nextId = await contracts.multiPropertyManager.nextPropertyId();
+        console.log('Next property ID:', nextId.toString());
+      } catch (error) {
+        console.error('Error calling nextPropertyId:', error);
+        // Fallback: try to get properties by checking individual IDs
+        console.log('Trying fallback method...');
+        nextId = 1; // Start with 1 and try to find properties
+      }
+      
       const propertyList = [];
 
-      for (let i = 1; i < nextId; i++) {
-        try {
-          const property = await contracts.multiPropertyManager.properties(i);
-          propertyList.push({
-            id: i,
-            name: property.name,
-            symbol: property.symbol,
-            creator: property.creator,
-            tokenContract: property.tokenContract,
-            deedHash: property.deedHash,
-            appraisalHash: property.appraisalHash,
-            kycDocHash: property.kycDocHash
-          });
-        } catch (error) {
-          console.error(`Error loading property ${i}:`, error);
+      // If nextPropertyId failed, try to find properties by checking individual IDs
+      if (nextId === 1) {
+        console.log('Using fallback method to find properties...');
+        let foundProperties = 0;
+        for (let i = 1; i <= 10; i++) { // Check up to 10 properties
+          try {
+            const property = await contracts.multiPropertyManager.properties(i);
+            if (property.name && property.name !== '') {
+              propertyList.push({
+                id: i,
+                name: property.name,
+                symbol: property.symbol,
+                creator: property.creator,
+                tokenContract: property.tokenContract,
+                deedHash: property.deedHash,
+                appraisalHash: property.appraisalHash,
+                kycDocHash: property.kycDocHash
+              });
+              foundProperties++;
+            }
+          } catch (error) {
+            // Property doesn't exist, continue
+            if (foundProperties === 0 && i > 3) break; // Stop if no properties found after checking a few
+          }
+        }
+      } else {
+        // Normal flow with nextPropertyId
+        for (let i = 1; i < nextId; i++) {
+          try {
+            const property = await contracts.multiPropertyManager.properties(i);
+            propertyList.push({
+              id: i,
+              name: property.name,
+              symbol: property.symbol,
+              creator: property.creator,
+              tokenContract: property.tokenContract,
+              deedHash: property.deedHash,
+              appraisalHash: property.appraisalHash,
+              kycDocHash: property.kycDocHash
+            });
+          } catch (error) {
+            console.error(`Error loading property ${i}:`, error);
+          }
         }
       }
 
@@ -70,35 +129,90 @@ const InvestorDashboard = () => {
 
   const loadTokenBalances = async () => {
     try {
-      if (!account || !contracts.multiPropertyManager) return;
+      if (!account || !contracts.multiPropertyManager) {
+        console.error('Account or MultiPropertyManager contract not available');
+        return;
+      }
+
+      console.log('Loading token balances...', {
+        account: !!account,
+        contract: !!contracts.multiPropertyManager,
+        nextPropertyId: typeof contracts.multiPropertyManager.nextPropertyId
+      });
 
       const balances = {};
-      const nextId = await contracts.multiPropertyManager.nextPropertyId();
+      let nextId;
+      try {
+        nextId = await contracts.multiPropertyManager.nextPropertyId();
+        console.log('Next property ID for balances:', nextId.toString());
+      } catch (error) {
+        console.error('Error calling nextPropertyId for balances:', error);
+        // Fallback: try to get properties by checking individual IDs
+        console.log('Trying fallback method for balances...');
+        nextId = 1; // Start with 1 and try to find properties
+      }
 
-      for (let i = 1; i < nextId; i++) {
-        try {
-          const property = await contracts.multiPropertyManager.properties(i);
-          const tokenContract = new ethers.Contract(
-            property.tokenContract,
-            [
-              "function balanceOf(address account) public view returns (uint256)",
-              "function totalSupply() public view returns (uint256)",
-              "function name() public view returns (string)",
-              "function symbol() public view returns (string)"
-            ],
-            contracts.multiPropertyManager.runner
-          );
+      // If nextPropertyId failed, try to find properties by checking individual IDs
+      if (nextId === 1) {
+        console.log('Using fallback method to find properties for balances...');
+        let foundProperties = 0;
+        for (let i = 1; i <= 10; i++) { // Check up to 10 properties
+          try {
+            const property = await contracts.multiPropertyManager.properties(i);
+            if (property.name && property.name !== '') {
+              const tokenContract = new ethers.Contract(
+                property.tokenContract,
+                [
+                  "function balanceOf(address account) public view returns (uint256)",
+                  "function totalSupply() public view returns (uint256)",
+                  "function name() public view returns (string)",
+                  "function symbol() public view returns (string)"
+                ],
+                contracts.multiPropertyManager.runner
+              );
 
-          const balance = await tokenContract.balanceOf(account);
-          const totalSupply = await tokenContract.totalSupply();
-          
-          balances[i] = {
-            balance: balance.toString(),
-            totalSupply: totalSupply.toString(),
-            percentage: totalSupply > 0 ? (Number(balance) / Number(totalSupply)) * 100 : 0
-          };
-        } catch (error) {
-          console.error(`Error loading balance for property ${i}:`, error);
+              const balance = await tokenContract.balanceOf(account);
+              const totalSupply = await tokenContract.totalSupply();
+              
+              balances[i] = {
+                balance: balance.toString(),
+                totalSupply: totalSupply.toString(),
+                percentage: totalSupply > 0 ? (Number(balance) / Number(totalSupply)) * 100 : 0
+              };
+              foundProperties++;
+            }
+          } catch (error) {
+            // Property doesn't exist, continue
+            if (foundProperties === 0 && i > 3) break; // Stop if no properties found after checking a few
+          }
+        }
+      } else {
+        // Normal flow with nextPropertyId
+        for (let i = 1; i < nextId; i++) {
+          try {
+            const property = await contracts.multiPropertyManager.properties(i);
+            const tokenContract = new ethers.Contract(
+              property.tokenContract,
+              [
+                "function balanceOf(address account) public view returns (uint256)",
+                "function totalSupply() public view returns (uint256)",
+                "function name() public view returns (string)",
+                "function symbol() public view returns (string)"
+              ],
+              contracts.multiPropertyManager.runner
+            );
+
+            const balance = await tokenContract.balanceOf(account);
+            const totalSupply = await tokenContract.totalSupply();
+            
+            balances[i] = {
+              balance: balance.toString(),
+              totalSupply: totalSupply.toString(),
+              percentage: totalSupply > 0 ? (Number(balance) / Number(totalSupply)) * 100 : 0
+            };
+          } catch (error) {
+            console.error(`Error loading balance for property ${i}:`, error);
+          }
         }
       }
 
@@ -111,19 +225,59 @@ const InvestorDashboard = () => {
 
   const loadRevenueData = async () => {
     try {
-      if (!account || !contracts.multiPropertyManager) return;
+      if (!account || !contracts.multiPropertyManager) {
+        console.error('Account or MultiPropertyManager contract not available');
+        return;
+      }
+
+      console.log('Loading revenue data...', {
+        account: !!account,
+        contract: !!contracts.multiPropertyManager,
+        nextPropertyId: typeof contracts.multiPropertyManager.nextPropertyId
+      });
 
       const revenue = {};
-      const nextId = await contracts.multiPropertyManager.nextPropertyId();
+      let nextId;
+      try {
+        nextId = await contracts.multiPropertyManager.nextPropertyId();
+        console.log('Next property ID for revenue:', nextId.toString());
+      } catch (error) {
+        console.error('Error calling nextPropertyId for revenue:', error);
+        // Fallback: try to get properties by checking individual IDs
+        console.log('Trying fallback method for revenue...');
+        nextId = 1; // Start with 1 and try to find properties
+      }
 
-      for (let i = 1; i < nextId; i++) {
-        try {
-          const ethRevenue = await contracts.multiPropertyManager.availableEthRevenue(i, account);
-          revenue[i] = {
-            eth: ethRevenue.toString()
-          };
-        } catch (error) {
-          console.error(`Error loading revenue for property ${i}:`, error);
+      // If nextPropertyId failed, try to find properties by checking individual IDs
+      if (nextId === 1) {
+        console.log('Using fallback method to find properties for revenue...');
+        let foundProperties = 0;
+        for (let i = 1; i <= 10; i++) { // Check up to 10 properties
+          try {
+            const property = await contracts.multiPropertyManager.properties(i);
+            if (property.name && property.name !== '') {
+              const ethRevenue = await contracts.multiPropertyManager.availableEthRevenue(i, account);
+              revenue[i] = {
+                eth: ethRevenue.toString()
+              };
+              foundProperties++;
+            }
+          } catch (error) {
+            // Property doesn't exist, continue
+            if (foundProperties === 0 && i > 3) break; // Stop if no properties found after checking a few
+          }
+        }
+      } else {
+        // Normal flow with nextPropertyId
+        for (let i = 1; i < nextId; i++) {
+          try {
+            const ethRevenue = await contracts.multiPropertyManager.availableEthRevenue(i, account);
+            revenue[i] = {
+              eth: ethRevenue.toString()
+            };
+          } catch (error) {
+            console.error(`Error loading revenue for property ${i}:`, error);
+          }
         }
       }
 
