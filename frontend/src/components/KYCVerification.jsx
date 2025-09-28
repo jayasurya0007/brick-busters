@@ -25,7 +25,12 @@ const KYCVerification = () => {
 
   useEffect(() => {
     if (isConnected && contracts.identityRegistry && account) {
-      checkVerificationStatus();
+      // Add a small delay to ensure contracts are fully initialized
+      const timer = setTimeout(() => {
+        checkVerificationStatus();
+      }, 1000);
+      
+      return () => clearTimeout(timer);
     }
   }, [isConnected, contracts, account]);
 
@@ -49,14 +54,28 @@ const KYCVerification = () => {
       });
     } catch (error) {
       console.error('Error checking verification status:', error);
-      setStatusError(true);
-      // Set default values
-      setVerificationStatus({
-        verified: false,
-        pending: false,
-        kycDoc: '',
-        timestamp: 0
-      });
+      
+      // If it's a contract call error (user hasn't submitted verification yet), 
+      // set default unverified state instead of showing error
+      if (error.message && error.message.includes('missing revert data')) {
+        console.log('User has not submitted verification yet - setting default state');
+        setVerificationStatus({
+          verified: false,
+          pending: false,
+          kycDoc: '',
+          timestamp: 0
+        });
+        setStatusError(false);
+      } else {
+        setStatusError(true);
+        // Set default values for other errors
+        setVerificationStatus({
+          verified: false,
+          pending: false,
+          kycDoc: '',
+          timestamp: 0
+        });
+      }
     } finally {
       setCheckingStatus(false);
     }
@@ -175,6 +194,17 @@ const KYCVerification = () => {
         <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
         <h2 className="text-xl font-semibold text-gray-900 mb-2">Unable to Check Status</h2>
         <p className="text-gray-600 mb-4">There was an error checking your verification status</p>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 max-w-md mx-auto">
+          <p className="text-sm text-blue-800">
+            <strong>Common causes:</strong>
+          </p>
+          <ul className="text-sm text-blue-700 mt-2 text-left">
+            <li>• Network connection issues</li>
+            <li>• Wrong network selected in MetaMask</li>
+            <li>• Contract not properly deployed</li>
+            <li>• You haven't submitted verification yet</li>
+          </ul>
+        </div>
         <button
           onClick={() => {
             setStatusError(false);
@@ -325,7 +355,7 @@ const KYCVerification = () => {
                 <div>
                   <h3 className="text-sm font-medium text-yellow-800">Important Information</h3>
                   <ul className="text-sm text-yellow-700 mt-2 space-y-1">
-                    <li>• Your verification request will be reviewed by platform administrators</li>
+                    <li>• Your verification request will be reviewed by the platform</li>
                     <li>• You will be notified once your verification is approved or rejected</li>
                     <li>• Only verified wallets can participate in token trading and marketplace activities</li>
                     <li>• Ensure your KYC document is valid and up-to-date</li>

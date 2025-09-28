@@ -1,15 +1,33 @@
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import walrusService from '../services/walrusService';
 import toast from 'react-hot-toast';
 
 export const useWalrus = () => {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [isServiceAvailable, setIsServiceAvailable] = useState(false);
+  
+  // Check if service is available
+  const checkServiceAvailability = useCallback(() => {
+    const available = walrusService.isServiceAvailable();
+    setIsServiceAvailable(available);
+    return available;
+  }, []);
+  
+  // Initialize service availability check
+  React.useEffect(() => {
+    checkServiceAvailability();
+  }, [checkServiceAvailability]);
 
   const uploadKycDocument = useCallback(async (file, userId) => {
     try {
       setUploading(true);
       setUploadProgress(0);
+      
+      // Check if service is available
+      if (!checkServiceAvailability()) {
+        throw new Error('File upload service is not available. Please check your configuration.');
+      }
       
       // Validate file
       if (!file) {
@@ -37,12 +55,17 @@ export const useWalrus = () => {
       setUploading(false);
       setUploadProgress(0);
     }
-  }, []);
+  }, [checkServiceAvailability]);
 
   const uploadPropertyDocument = useCallback(async (file, propertyId, documentType) => {
     try {
       setUploading(true);
       setUploadProgress(0);
+      
+      // Check if service is available
+      if (!checkServiceAvailability()) {
+        throw new Error('File upload service is not available. Please check your configuration.');
+      }
       
       // Validate file
       if (!file) {
@@ -70,20 +93,27 @@ export const useWalrus = () => {
       setUploading(false);
       setUploadProgress(0);
     }
-  }, []);
+  }, [checkServiceAvailability]);
 
   const getFileInfo = useCallback(async (uploadId) => {
     try {
+      if (!checkServiceAvailability()) {
+        throw new Error('File service is not available');
+      }
       return await walrusService.getFileInfo(uploadId);
     } catch (error) {
       console.error('Get file info error:', error);
       toast.error('Failed to get file information');
       throw error;
     }
-  }, []);
+  }, [checkServiceAvailability]);
 
   const downloadFile = useCallback(async (uploadId, filename) => {
     try {
+      if (!checkServiceAvailability()) {
+        throw new Error('File service is not available');
+      }
+      
       const fileBuffer = await walrusService.downloadFile(uploadId);
       
       // Create download link
@@ -103,20 +133,26 @@ export const useWalrus = () => {
       toast.error('Failed to download file');
       throw error;
     }
-  }, []);
+  }, [checkServiceAvailability]);
 
   const listFiles = useCallback(async (metadataFilter = {}) => {
     try {
+      if (!checkServiceAvailability()) {
+        throw new Error('File service is not available');
+      }
       return await walrusService.listFiles(metadataFilter);
     } catch (error) {
       console.error('List files error:', error);
       toast.error('Failed to list files');
       throw error;
     }
-  }, []);
+  }, [checkServiceAvailability]);
 
   const deleteFile = useCallback(async (uploadId) => {
     try {
+      if (!checkServiceAvailability()) {
+        throw new Error('File service is not available');
+      }
       await walrusService.deleteFile(uploadId);
       toast.success('File deleted successfully!');
       return true;
@@ -125,7 +161,7 @@ export const useWalrus = () => {
       toast.error('Failed to delete file');
       throw error;
     }
-  }, []);
+  }, [checkServiceAvailability]);
 
   const generateDocumentHash = useCallback((file) => {
     return walrusService.generateDocumentHash(file);
@@ -138,6 +174,7 @@ export const useWalrus = () => {
   return {
     uploading,
     uploadProgress,
+    isServiceAvailable,
     uploadKycDocument,
     uploadPropertyDocument,
     getFileInfo,
@@ -145,7 +182,8 @@ export const useWalrus = () => {
     listFiles,
     deleteFile,
     generateDocumentHash,
-    getVaultGalleryUrl
+    getVaultGalleryUrl,
+    checkServiceAvailability
   };
 };
 

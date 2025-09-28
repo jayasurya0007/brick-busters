@@ -8,7 +8,6 @@ const Home = () => {
   const { account, isConnected, contracts, isWalletVerified, chainId, connectWallet } = useWeb3();
   const [properties, setProperties] = useState([]);
   const [isVerified, setIsVerified] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,11 +31,6 @@ const Home = () => {
         setIsVerified(verified);
       }
 
-      // Check if user is admin
-      if (contracts.identityRegistry && account) {
-        const admin = await contracts.identityRegistry.owner();
-        setIsAdmin(admin.toLowerCase() === account.toLowerCase());
-      }
 
       // Load properties
       await loadProperties();
@@ -151,16 +145,6 @@ const Home = () => {
       }
     ];
 
-    if (isAdmin) {
-      cards.unshift({
-        title: 'Admin',
-        description: 'Manage the platform, verify wallets, and oversee all properties',
-        icon: Shield,
-        href: '/admin',
-        color: 'bg-primary-500',
-        available: true
-      });
-    }
 
     return cards;
   };
@@ -458,7 +442,7 @@ const Home = () => {
                       <p className="text-dark-text-secondary mb-6 leading-relaxed">{role.description}</p>
                       {!role.available && (
                         <div className="text-sm text-dark-error font-medium">
-                          {role.title === 'Admin' ? 'Admin access required' : 'Wallet verification required'}
+                          Wallet verification required
                         </div>
                       )}
                       {role.available && (

@@ -14,7 +14,7 @@ const WalrusFileUpload = ({
   const [dragActive, setDragActive] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const fileInputRef = useRef(null);
-  const { uploadKycDocument, uploadPropertyDocument, deleteFile, downloading } = useWalrus();
+  const { uploadKycDocument, uploadPropertyDocument, deleteFile, downloading, isServiceAvailable } = useWalrus();
 
   const handleDrag = (e) => {
     e.preventDefault();
@@ -117,6 +117,30 @@ const WalrusFileUpload = ({
     if (fileType.includes('image')) return '🖼️';
     return '📁';
   };
+
+  // Show fallback UI if service is not available
+  if (!isServiceAvailable) {
+    return (
+      <div className="space-y-4">
+        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50">
+          <div className="text-center">
+            <File className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-lg font-medium text-gray-900 mb-2">
+              File Upload Service Unavailable
+            </p>
+            <p className="text-sm text-gray-500 mb-4">
+              The file upload service is currently not available. Please check your configuration or try again later.
+            </p>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <p className="text-sm text-yellow-800">
+                <strong>Note:</strong> File uploads are disabled. You can still proceed with other features of the application.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

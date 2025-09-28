@@ -325,7 +325,7 @@ const InvestorDashboard = () => {
       <div className="text-center py-12">
         <Users className="h-12 w-12 text-orange-500 mx-auto mb-4" />
         <h2 className="text-xl font-semibold text-gray-900 mb-2">Wallet Verification Required</h2>
-        <p className="text-gray-600">Your wallet needs to be verified by an admin to invest in properties</p>
+        <p className="text-gray-600">Your wallet needs to be verified to invest in properties</p>
       </div>
     );
   }

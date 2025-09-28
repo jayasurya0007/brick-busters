@@ -105,6 +105,9 @@ export const Web3Provider = ({ children }) => {
   // Initialize contract instances
   const initializeContracts = async (provider, signer) => {
     try {
+      // Skip contract verification to avoid circuit breaker
+      console.log('⏭️ Skipping contract verification to avoid MetaMask circuit breaker');
+      console.log('✅ Using real contracts directly');
       const identityRegistry = new ethers.Contract(
         CONTRACT_ADDRESSES.IDENTITY_REGISTRY,
         [
@@ -120,7 +123,7 @@ export const Web3Provider = ({ children }) => {
           "function getVerificationStatus(address wallet) external view returns (bool verified, bool pending, string memory kycDoc, uint256 timestamp)",
           "function owner() external view returns (address)"
         ],
-        signer
+        provider
       );
 
       const complianceModule = new ethers.Contract(
@@ -129,7 +132,7 @@ export const Web3Provider = ({ children }) => {
           "function checkCompliance(address to) public view returns (bool)",
           "function setIdentityRegistry(address _identityRegistry) external"
         ],
-        signer
+        provider
       );
 
       const multiPropertyManager = new ethers.Contract(
@@ -167,41 +170,49 @@ export const Web3Provider = ({ children }) => {
         }
       });
 
+      // Create enhanced contract objects for IdentityRegistry and ComplianceModule
+      const enhancedIdentityRegistry = new Proxy(identityRegistry, {
+        get(target, prop) {
+          if (prop === 'runner') return provider;
+          if (prop === 'signer') return signer;
+          if (prop === 'provider') return provider;
+          return target[prop];
+        }
+      });
+
+      const enhancedComplianceModule = new Proxy(complianceModule, {
+        get(target, prop) {
+          if (prop === 'runner') return provider;
+          if (prop === 'signer') return signer;
+          if (prop === 'provider') return provider;
+          return target[prop];
+        }
+      });
+
       setContracts({
-        identityRegistry,
-        complianceModule,
+        identityRegistry: enhancedIdentityRegistry,
+        complianceModule: enhancedComplianceModule,
         multiPropertyManager: enhancedMultiPropertyManager
       });
 
       // Debug: Check if contract functions are available
       console.log('Contract initialized:', {
+        identityRegistry: !!identityRegistry,
+        complianceModule: !!complianceModule,
         multiPropertyManager: !!multiPropertyManager,
         nextPropertyId: typeof multiPropertyManager.nextPropertyId,
-        address: CONTRACT_ADDRESSES.MULTI_PROPERTY_MANAGER
+        isVerified: typeof identityRegistry.isVerified,
+        addresses: {
+          identityRegistry: CONTRACT_ADDRESSES.IDENTITY_REGISTRY,
+          complianceModule: CONTRACT_ADDRESSES.COMPLIANCE_MODULE,
+          multiPropertyManager: CONTRACT_ADDRESSES.MULTI_PROPERTY_MANAGER
+        }
       });
 
-      // Test contract functions
-      try {
-        const testResult = await multiPropertyManager.nextPropertyId();
-        console.log('✅ Contract test successful, nextPropertyId:', testResult.toString());
-        
-        // Test the enhanced contract
-        const enhancedTestResult = await enhancedMultiPropertyManager.nextPropertyId();
-        console.log('✅ Enhanced contract test successful, nextPropertyId:', enhancedTestResult.toString());
-        console.log('✅ Enhanced contract runner:', !!enhancedMultiPropertyManager.runner);
-        console.log('✅ Enhanced contract signer:', !!enhancedMultiPropertyManager.signer);
-      } catch (error) {
-        console.error('❌ Contract test failed:', error);
-        console.log('Contract details:', {
-          target: multiPropertyManager.target,
-          interface: multiPropertyManager.interface,
-          runner: !!multiPropertyManager.runner,
-          signer: !!multiPropertyManager.signer
-        });
-      }
     } catch (error) {
       console.error('Error initializing contracts:', error);
-      toast.error('Failed to initialize contracts');
+      toast.error('Failed to initialize contracts. Please check your network connection.');
+      throw error;
     }
   };
 
@@ -216,17 +227,6 @@ export const Web3Provider = ({ children }) => {
     toast.success('Wallet disconnected');
   };
 
-  // Check if user is admin (owner of contracts)
-  const isAdmin = async () => {
-    if (!contracts.identityRegistry || !account) return false;
-    try {
-      const owner = await contracts.identityRegistry.owner();
-      return owner.toLowerCase() === account.toLowerCase();
-    } catch (error) {
-      console.error('Error checking admin status:', error);
-      return false;
-    }
-  };
 
   // Check if wallet is verified
   const isWalletVerified = async (walletAddress = account) => {
@@ -276,7 +276,6 @@ export const Web3Provider = ({ children }) => {
     chainId,
     connectWallet,
     disconnectWallet,
-    isAdmin,
     isWalletVerified,
     switchToCorrectNetwork
   };

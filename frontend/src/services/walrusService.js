@@ -1,34 +1,26 @@
 class WalrusService {
   constructor() {
-    // Check if we're in development mode or if API key is not set
-    const isDevelopment = import.meta.env.DEV;
     const hasApiKey = import.meta.env.VITE_TUSKY_API_KEY;
-    
-    if (!hasApiKey && !isDevelopment) {
-      throw new Error('VITE_TUSKY_API_KEY is not set in environment variables');
-    }
     
     this.apiKey = import.meta.env.VITE_TUSKY_API_KEY;
     this.baseUrl = 'https://api.tusky.io';
     this.vaultId = null;
-    this.isMockMode = !hasApiKey || isDevelopment;
+    this.isAvailable = false;
+    this.initializationError = null;
     
-    if (this.isMockMode) {
-      console.log('Using mock Walrus service for development');
-      this.initializeMockService();
-    } else {
-      this.initializeVault();
-    }
+    // Initialize vault asynchronously without blocking
+    this.initializeVault().catch(error => {
+      console.warn('Walrus service unavailable:', error.message);
+      this.initializationError = error;
+    });
   }
 
-  async initializeMockService() {
-    // Import and use mock service
-    const MockWalrusService = (await import('./mockWalrusService.js')).default;
-    this.mockService = new MockWalrusService();
-    this.vaultId = this.mockService.vaultId;
-  }
 
   async initializeVault() {
+    if (!this.apiKey) {
+      throw new Error('VITE_TUSKY_API_KEY is not set in environment variables');
+    }
+    
     try {
       // Create or get existing vault for the application
       const vaults = await this.listVaults();
@@ -42,14 +34,21 @@ class WalrusService {
       }
       
       this.vaultId = vault.id;
+      this.isAvailable = true;
       console.log('Walrus vault initialized:', vault.id);
     } catch (error) {
-      console.error('Failed to initialize Walrus vault:', error);
-      throw error;
+      console.warn('Failed to initialize Walrus vault:', error.message);
+      this.isAvailable = false;
+      this.initializationError = error;
+      // Don't throw error, just mark as unavailable
     }
   }
 
   async makeRequest(endpoint, options = {}) {
+    if (!this.isAvailable) {
+      throw new Error('Walrus service is not available');
+    }
+    
     const url = `${this.baseUrl}${endpoint}`;
     const config = {
       headers: {
@@ -70,10 +69,16 @@ class WalrusService {
   }
 
   async listVaults() {
+    if (!this.isAvailable) {
+      throw new Error('Walrus service is not available');
+    }
     return await this.makeRequest('/vaults');
   }
 
   async createVault(name, options = {}) {
+    if (!this.isAvailable) {
+      throw new Error('Walrus service is not available');
+    }
     return await this.makeRequest('/vaults', {
       method: 'POST',
       body: JSON.stringify({
@@ -85,10 +90,10 @@ class WalrusService {
   }
 
   async uploadKycDocument(file, userId) {
-    if (this.isMockMode) {
-      return await this.mockService.uploadKycDocument(file, userId);
+    if (!this.isAvailable) {
+      throw new Error('Walrus service is not available. File uploads are disabled.');
     }
-
+    
     try {
       const fileName = `kyc-${userId}-${Date.now()}.${this.getFileExtension(file.name)}`;
       
@@ -130,10 +135,10 @@ class WalrusService {
   }
 
   async uploadPropertyDocument(file, propertyId, documentType) {
-    if (this.isMockMode) {
-      return await this.mockService.uploadPropertyDocument(file, propertyId, documentType);
+    if (!this.isAvailable) {
+      throw new Error('Walrus service is not available. File uploads are disabled.');
     }
-
+    
     try {
       const fileName = `${documentType}-${propertyId}-${Date.now()}.${this.getFileExtension(file.name)}`;
       
@@ -176,10 +181,10 @@ class WalrusService {
   }
 
   async getFileInfo(uploadId) {
-    if (this.isMockMode) {
-      return await this.mockService.getFileInfo(uploadId);
+    if (!this.isAvailable) {
+      throw new Error('Walrus service is not available');
     }
-
+    
     try {
       return await this.makeRequest(`/files/${uploadId}`);
     } catch (error) {
@@ -189,10 +194,10 @@ class WalrusService {
   }
 
   async downloadFile(uploadId) {
-    if (this.isMockMode) {
-      return await this.mockService.downloadFile(uploadId);
+    if (!this.isAvailable) {
+      throw new Error('Walrus service is not available');
     }
-
+    
     try {
       const response = await fetch(`${this.baseUrl}/files/${uploadId}/download`, {
         headers: {
@@ -212,10 +217,10 @@ class WalrusService {
   }
 
   async listFiles(metadataFilter = {}) {
-    if (this.isMockMode) {
-      return await this.mockService.listFiles(metadataFilter);
+    if (!this.isAvailable) {
+      throw new Error('Walrus service is not available');
     }
-
+    
     try {
       const files = await this.makeRequest(`/vaults/${this.vaultId}/files`);
       
@@ -236,10 +241,10 @@ class WalrusService {
   }
 
   async deleteFile(uploadId) {
-    if (this.isMockMode) {
-      return await this.mockService.deleteFile(uploadId);
+    if (!this.isAvailable) {
+      throw new Error('Walrus service is not available');
     }
-
+    
     try {
       await this.makeRequest(`/files/${uploadId}`, {
         method: 'DELETE'
@@ -257,10 +262,6 @@ class WalrusService {
 
   // Generate hash for blockchain storage
   generateDocumentHash(file) {
-    if (this.isMockMode) {
-      return this.mockService.generateDocumentHash(file);
-    }
-
     // This would typically use a cryptographic hash function
     // For now, we'll use a simple hash based on file content and metadata
     const timestamp = Date.now();
@@ -280,10 +281,10 @@ class WalrusService {
 
   // Get vault information
   async getVaultInfo() {
-    if (this.isMockMode) {
-      return await this.mockService.getVaultInfo();
+    if (!this.isAvailable) {
+      throw new Error('Walrus service is not available');
     }
-
+    
     try {
       return await this.makeRequest(`/vaults/${this.vaultId}`);
     } catch (error) {
@@ -294,10 +295,20 @@ class WalrusService {
 
   // Get vault gallery URL
   getVaultGalleryUrl() {
-    if (this.isMockMode) {
-      return this.mockService.getVaultGalleryUrl();
+    if (!this.isAvailable) {
+      return null;
     }
     return `https://app.tusky.io/vaults/${this.vaultId}/assets/gallery`;
+  }
+  
+  // Check if service is available
+  isServiceAvailable() {
+    return this.isAvailable;
+  }
+  
+  // Get initialization error
+  getInitializationError() {
+    return this.initializationError;
   }
 }
 

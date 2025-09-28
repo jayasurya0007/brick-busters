@@ -254,7 +254,7 @@ const PropertyCreatorDashboard = () => {
       <div className="text-center py-12">
         <Users className="h-12 w-12 text-orange-500 mx-auto mb-4" />
         <h2 className="text-xl font-semibold text-gray-900 mb-2">Wallet Verification Required</h2>
-        <p className="text-gray-600">Your wallet needs to be verified by an admin to create and manage properties</p>
+        <p className="text-gray-600">Your wallet needs to be verified to create and manage properties</p>
       </div>
     );
   }
@@ -325,7 +325,7 @@ const PropertyCreatorDashboard = () => {
         {myProperties.length === 0 && (
           <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
             <p className="text-sm text-yellow-800">
-              <strong>No properties found:</strong> You don't have any properties yet. Contact an admin to create a property for you.
+              <strong>No properties found:</strong> You don't have any properties yet. Properties will be created for you once you're verified.
             </p>
             <p className="text-xs text-yellow-700 mt-1">
               Only property creators can mint tokens for their properties.
