@@ -476,30 +476,50 @@ const Marketplace = () => {
 
   if (!isConnected) {
     return (
-      <div className="text-center py-12">
-        <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">Connect Your Wallet</h2>
-        <p className="text-gray-600">Please connect your wallet to access the marketplace</p>
+      <div className="min-h-screen bg-dark-bg flex items-center justify-center">
+        <div className="text-center py-20 max-w-md mx-auto px-6">
+          <div className="bg-dark-card border border-dark-border rounded-2xl p-8">
+            <ShoppingCart className="h-16 w-16 text-primary-500 mx-auto mb-6" />
+            <h2 className="text-2xl font-bold text-dark-text-primary mb-4">Connect Your Wallet</h2>
+            <p className="text-dark-text-secondary mb-8">Please connect your wallet to access the marketplace and start trading property tokens</p>
+            <div className="bg-primary-500/10 border border-primary-500/20 rounded-lg p-4">
+              <p className="text-sm text-primary-400">MetaMask wallet required for secure trading</p>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (dataLoading) {
     return (
-      <div className="text-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Marketplace</h2>
-        <p className="text-gray-600">Please wait while we load available properties...</p>
+      <div className="min-h-screen bg-dark-bg flex items-center justify-center">
+        <div className="text-center py-20">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-6"></div>
+          <h2 className="text-2xl font-bold text-dark-text-primary mb-4">Loading Marketplace</h2>
+          <p className="text-xl text-dark-text-secondary">Please wait while we load available properties...</p>
+        </div>
       </div>
     );
   }
 
   if (!isVerified) {
     return (
-      <div className="text-center py-12">
-        <Users className="h-12 w-12 text-orange-500 mx-auto mb-4" />
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">Wallet Verification Required</h2>
-        <p className="text-gray-600">Your wallet needs to be verified to buy property tokens</p>
+      <div className="min-h-screen bg-dark-bg flex items-center justify-center">
+        <div className="text-center py-20 max-w-md mx-auto px-6">
+          <div className="bg-dark-card border border-dark-border rounded-2xl p-8">
+            <Users className="h-16 w-16 text-dark-warning mx-auto mb-6" />
+            <h2 className="text-2xl font-bold text-dark-text-primary mb-4">Verification Required</h2>
+            <p className="text-dark-text-secondary mb-8">Your wallet needs to be verified through our KYC process to access the marketplace</p>
+            <div className="bg-dark-warning/10 border border-dark-warning/20 rounded-lg p-4 mb-6">
+              <p className="text-sm text-dark-warning">Complete identity verification to start trading</p>
+            </div>
+            <button className="bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center mx-auto group">
+              <Users className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform" />
+              Start Verification
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -509,32 +529,59 @@ const Marketplace = () => {
   );
 
   return (
-    <main className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>  
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Property Token Marketplace</h1>
-          <p className="text-gray-600">Buy, sell, and upload fractional ownership tokens for real estate properties</p>
+    <div className="min-h-screen bg-dark-bg">
+      {/* Hero Section */}
+      <div className="relative">
+        {/* Background Image Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-r from-dark-bg via-dark-bg/90 to-transparent z-10"></div>
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-20"
+          style={{
+            backgroundImage: `url('https://images.unsplash.com/photo-1560518883-ce09059eeffa?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1973&q=80')`
+          }}
+        ></div>
+        
+        {/* Content */}
+        <div className="relative z-20 container mx-auto px-6 lg:px-8 py-16">
+          <div className="max-w-4xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="bg-primary-500/10 border border-primary-500/20 rounded-xl p-3">
+                  <ShoppingCart className="h-8 w-8 text-primary-500" />
+                </div>
+                <div>
+                  <h1 className="text-4xl lg:text-5xl font-bold text-dark-text-primary leading-tight">
+                    Property Marketplace
+                  </h1>
+                  <p className="text-xl text-dark-text-secondary mt-2">
+                    Buy, sell, and trade fractional ownership tokens for real estate
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={loadData}
+                disabled={dataLoading}
+                className="bg-dark-border hover:bg-dark-border/70 text-dark-text-primary py-2 px-4 rounded-lg font-semibold transition-all duration-300 text-sm flex items-center space-x-2"
+              >
+                <TrendingUp className="h-4 w-4" />
+                <span>Refresh</span>
+              </button>
+            </div>
+          </div>
         </div>
-        <button
-          onClick={loadData}
-          disabled={dataLoading}
-          className="btn-secondary flex items-center space-x-2"
-        >
-          <TrendingUp className="h-4 w-4" />
-          <span>Refresh</span>
-        </button>
       </div>
 
+    <main className="container mx-auto px-6 lg:px-8 py-12">
+    <div className="space-y-12">
       {/* Tab Navigation */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
+      <div className="bg-dark-card border border-dark-border rounded-2xl p-2">
+        <nav className="flex space-x-2">
           <button
             onClick={() => setActiveTab('buy')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+            className={`py-3 px-6 rounded-lg font-medium text-sm transition-all duration-300 ${
               activeTab === 'buy'
-                ? 'border-primary-500 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'bg-primary-500 text-white'
+                : 'text-dark-text-secondary hover:text-dark-text-primary hover:bg-dark-border'
             }`}
           >
             <ShoppingCart className="h-4 w-4 inline mr-2" />
@@ -542,10 +589,10 @@ const Marketplace = () => {
           </button>
           <button
             onClick={() => setActiveTab('sell')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+            className={`py-3 px-6 rounded-lg font-medium text-sm transition-all duration-300 ${
               activeTab === 'sell'
-                ? 'border-primary-500 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'bg-secondary-500 text-white'
+                : 'text-dark-text-secondary hover:text-dark-text-primary hover:bg-dark-border'
             }`}
           >
             <TrendingUp className="h-4 w-4 inline mr-2" />
@@ -553,10 +600,10 @@ const Marketplace = () => {
           </button>
           <button
             onClick={() => setActiveTab('resell')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+            className={`py-3 px-6 rounded-lg font-medium text-sm transition-all duration-300 ${
               activeTab === 'resell'
-                ? 'border-primary-500 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'bg-primary-500 text-white'
+                : 'text-dark-text-secondary hover:text-dark-text-primary hover:bg-dark-border'
             }`}
           >
             <Building className="h-4 w-4 inline mr-2" />
@@ -564,10 +611,10 @@ const Marketplace = () => {
           </button>
           <button
             onClick={() => setActiveTab('upload')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+            className={`py-3 px-6 rounded-lg font-medium text-sm transition-all duration-300 ${
               activeTab === 'upload'
-                ? 'border-primary-500 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'bg-primary-500 text-white'
+                : 'text-dark-text-secondary hover:text-dark-text-primary hover:bg-dark-border'
             }`}
           >
             <Building className="h-4 w-4 inline mr-2" />
@@ -579,7 +626,7 @@ const Marketplace = () => {
       {/* Buy Tokens Tab */}
       {activeTab === 'buy' && (
         <div className="card">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+          <h2 className="text-xl font-semibold text-white mb-6 flex items-center">
             <ShoppingCart className="h-5 w-5 mr-2" />
             Buy Property Tokens
           </h2>
@@ -635,8 +682,8 @@ const Marketplace = () => {
           </div>
         </div>
         {purchaseForm.propertyId && purchaseForm.amount && (
-          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-800">
+          <div className="mt-4 p-4 bg-blue-600 border border-blue-500 rounded-lg">
+            <p className="text-sm text-white">
               <strong>Total Cost:</strong> {(() => {
                 try {
                   const amount = parseFloat(purchaseForm.amount);
@@ -658,7 +705,7 @@ const Marketplace = () => {
       {/* Sell Tokens Tab */}
       {activeTab === 'sell' && (
         <div className="card">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+          <h2 className="text-xl font-semibold text-white mb-6 flex items-center">
             <TrendingUp className="h-5 w-5 mr-2" />
             Sell Your Tokens
           </h2>
@@ -724,8 +771,8 @@ const Marketplace = () => {
             </button>
           </div>
           {sellForm.propertyId && sellForm.amount && sellForm.pricePerToken && (
-            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-sm text-green-800">
+            <div className="mt-4 p-4 bg-green-600 border border-green-500 rounded-lg">
+              <p className="text-sm text-white">
                 <strong>Total Revenue:</strong> {(() => {
                   try {
                     const amount = parseFloat(sellForm.amount);
@@ -745,7 +792,7 @@ const Marketplace = () => {
       {/* Upload Property Tab */}
       {activeTab === 'upload' && (
         <div className="card">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+          <h2 className="text-xl font-semibold text-white mb-6 flex items-center">
             <Building className="h-5 w-5 mr-2" />
             Upload New Property
           </h2>
@@ -837,7 +884,7 @@ const Marketplace = () => {
       {/* Resell Tokens Tab */}
       {activeTab === 'resell' && (
         <div className="card">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+          <h2 className="text-xl font-semibold text-white mb-6 flex items-center">
             <Building className="h-5 w-5 mr-2" />
             Resell Your Tokens
           </h2>
@@ -891,8 +938,8 @@ const Marketplace = () => {
               <span>List for Resale</span>
             </button>
           </div>
-          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-800">
+          <div className="mt-4 p-4 bg-blue-600 border border-blue-500 rounded-lg">
+            <p className="text-sm text-white">
               <strong>Secondary Market:</strong> List your owned tokens for sale at your desired price. 
               Other buyers can purchase them directly from you.
             </p>
@@ -903,65 +950,65 @@ const Marketplace = () => {
       {/* Available Properties */}
       <div className="card">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+          <h2 className="text-xl font-semibold text-white flex items-center">
             <Building className="h-5 w-5 mr-2" />
             Available Properties ({activeProperties.length})
           </h2>
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-white">
             Properties with tokens available for purchase
           </div>
         </div>
         {activeProperties.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <Building className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+          <div className="text-center py-8 text-white">
+            <Building className="h-12 w-12 text-white mx-auto mb-4" />
             <p>No properties available for trading.</p>
             <p className="text-sm mt-2">Property creators need to mint and approve tokens for sale first.</p>
-            <p className="text-xs mt-1 text-gray-400">Available tokens = Creator's token balance (0 if not minted yet)</p>
+            <p className="text-xs mt-1 text-white">Available tokens = Creator's token balance (0 if not minted yet)</p>
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {activeProperties.map((property) => {
               const marketInfo = marketData[property.id];
               return (
-                <div key={property.id} className="border border-gray-200 rounded-lg p-6">
+                <div key={property.id} className="border border-gray-600 rounded-lg p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">{property.name}</h3>
-                    <span className="text-sm text-gray-500 bg-green-100 px-2 py-1 rounded">
+                    <h3 className="text-lg font-semibold text-white">{property.name}</h3>
+                    <span className="text-sm text-white bg-green-600 px-2 py-1 rounded">
                       {property.symbol}
                     </span>
                   </div>
                   
                   <div className="space-y-3 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Property Value:</span>
-                      <span className="font-medium">{ethers.formatEther(marketInfo?.propertyValue || '0')} ETH</span>
+                      <span className="text-white">Property Value:</span>
+                      <span className="font-medium text-white">{ethers.formatEther(marketInfo?.propertyValue || '0')} ETH</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Token Price:</span>
-                      <span className="font-medium">{ethers.formatEther(marketInfo?.tokenPrice || '0')} ETH</span>
+                      <span className="text-white">Token Price:</span>
+                      <span className="font-medium text-white">{ethers.formatEther(marketInfo?.tokenPrice || '0')} ETH</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Available Tokens:</span>
-                      <span className={`font-medium ${(marketInfo?.availableTokens || 0) > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                      <span className="text-white">Available Tokens:</span>
+                      <span className={`font-medium ${(marketInfo?.availableTokens || 0) > 0 ? 'text-green-400' : 'text-red-400'}`}>
                         {ethers.formatEther(marketInfo?.availableTokens || '0')}
                         {(marketInfo?.availableTokens || 0) === 0 && (
-                          <span className="text-xs ml-1">(Not minted)</span>
+                          <span className="text-xs ml-1 text-white">(Not minted)</span>
                         )}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Your Tokens:</span>
-                      <span className={`font-medium ${(userTokenBalances[property.id] || 0) > 0 ? 'text-blue-600' : 'text-gray-500'}`}>
+                      <span className="text-white">Your Tokens:</span>
+                      <span className={`font-medium ${(userTokenBalances[property.id] || 0) > 0 ? 'text-blue-400' : 'text-white'}`}>
                         {ethers.formatEther(userTokenBalances[property.id] || '0')}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Creator:</span>
-                      <span className="text-xs">{property.creator.slice(0, 6)}...{property.creator.slice(-4)}</span>
+                      <span className="text-white">Creator:</span>
+                      <span className="text-xs text-white">{property.creator.slice(0, 6)}...{property.creator.slice(-4)}</span>
                     </div>
                   </div>
 
-                  <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="mt-4 pt-4 border-t border-gray-600">
                     <div className="flex space-x-2">
                       <button
                         onClick={() => {
@@ -971,7 +1018,7 @@ const Marketplace = () => {
                         disabled={(marketInfo?.availableTokens || 0) === 0}
                         className={`flex-1 text-sm ${
                           (marketInfo?.availableTokens || 0) === 0 
-                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed px-4 py-2 rounded-md' 
+                            ? 'bg-gray-600 text-gray-300 cursor-not-allowed px-4 py-2 rounded-md' 
                             : 'btn-primary'
                         }`}
                       >
@@ -996,7 +1043,9 @@ const Marketplace = () => {
           </div>
         )}
       </div>
-    </div></main>
+    </div>
+    </main>
+    </div>
   );
 };
 

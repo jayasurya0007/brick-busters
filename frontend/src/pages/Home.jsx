@@ -545,14 +545,11 @@ const Home = () => {
         <div className="container mx-auto px-6 lg:px-8">
           <div className="grid md:grid-cols-4 gap-8">
             <div>
-              <h3 className="text-xl font-bold text-dark-text-primary mb-4">PropertyToken</h3>
+              <h3 className="text-xl font-bold text-dark-text-primary mb-4">Brick Busters</h3>
               <p className="text-dark-text-secondary mb-4">
                 Revolutionizing real estate investment through blockchain technology.
               </p>
-              <div className="flex space-x-4">
-                <Globe className="h-6 w-6 text-dark-text-secondary hover:text-primary-500 cursor-pointer transition-colors" />
-                <Star className="h-6 w-6 text-dark-text-secondary hover:text-primary-500 cursor-pointer transition-colors" />
-              </div>
+            
             </div>
             
             <div>
@@ -584,7 +581,7 @@ const Home = () => {
           </div>
           
           <div className="border-t border-dark-border mt-8 pt-8 text-center text-dark-text-secondary">
-            <p>&copy; 2024 PropertyToken. All rights reserved.</p>
+            <p>&copy; 2025 PropertyToken. All rights reserved.</p>
           </div>
         </div>
       </footer>
