@@ -17,6 +17,11 @@ const Marketplace = () => {
     amount: '',
     pricePerToken: ''
   });
+  const [resellForm, setResellForm] = useState({
+    propertyId: '',
+    amount: '',
+    pricePerToken: ''
+  });
   const [uploadForm, setUploadForm] = useState({
     name: '',
     symbol: '',
@@ -26,7 +31,7 @@ const Marketplace = () => {
     appraisalHash: '',
     kycDocHash: ''
   });
-  const [activeTab, setActiveTab] = useState('buy'); // 'buy', 'sell', 'upload'
+  const [activeTab, setActiveTab] = useState('buy'); // 'buy', 'sell', 'resell', 'upload'
   const [loading, setLoading] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
@@ -411,6 +416,64 @@ const Marketplace = () => {
     }
   };
 
+  const resellTokens = async () => {
+    if (!resellForm.propertyId || !resellForm.amount || !resellForm.pricePerToken) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    const property = properties.find(p => p.id === parseInt(resellForm.propertyId));
+    if (!property) {
+      toast.error('Property not found');
+      return;
+    }
+
+    // Check if user has enough tokens
+    const userBalance = userTokenBalances[property.id] || 0;
+    const amount = ethers.parseEther(resellForm.amount);
+    
+    if (userBalance < amount) {
+      toast.error('Insufficient token balance');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Approve tokens for the marketplace contract
+      const tokenContract = new ethers.Contract(
+        property.tokenContract,
+        [
+          "function approve(address spender, uint256 amount) external returns (bool)"
+        ],
+        contracts.multiPropertyManager.signer
+      );
+
+      const approveTx = await tokenContract.approve(
+        contracts.multiPropertyManager.target,
+        amount
+      );
+      await approveTx.wait();
+
+      // List tokens for resale
+      const tx = await contracts.multiPropertyManager.listTokensForSale(
+        parseInt(resellForm.propertyId),
+        amount,
+        ethers.parseEther(resellForm.pricePerToken)
+      );
+      await tx.wait();
+      
+      toast.success('Tokens listed for resale successfully');
+      setResellForm({ propertyId: '', amount: '', pricePerToken: '' });
+      await loadData();
+    } catch (error) {
+      console.error('Error reselling tokens:', error);
+      toast.error('Failed to resell tokens');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!isConnected) {
     return (
       <div className="text-center py-12">
@@ -487,6 +550,17 @@ const Marketplace = () => {
           >
             <TrendingUp className="h-4 w-4 inline mr-2" />
             Sell Tokens
+          </button>
+          <button
+            onClick={() => setActiveTab('resell')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'resell'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <Building className="h-4 w-4 inline mr-2" />
+            Resell Tokens
           </button>
           <button
             onClick={() => setActiveTab('upload')}
@@ -756,6 +830,72 @@ const Marketplace = () => {
               <Building className="h-4 w-4" />
               <span>Upload Property</span>
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Resell Tokens Tab */}
+      {activeTab === 'resell' && (
+        <div className="card">
+          <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+            <Building className="h-5 w-5 mr-2" />
+            Resell Your Tokens
+          </h2>
+          <div className="grid md:grid-cols-3 gap-6">
+            <div>
+              <label className="label">Property ID</label>
+              <select
+                value={resellForm.propertyId}
+                onChange={(e) => setResellForm({...resellForm, propertyId: e.target.value})}
+                className="input-field"
+              >
+                <option value="">Select Property</option>
+                {properties
+                  .filter(property => (userTokenBalances[property.id] || 0) > 0)
+                  .map(property => (
+                    <option key={property.id} value={property.id}>
+                      {property.name} ({property.symbol}) - Balance: {ethers.formatEther(userTokenBalances[property.id] || 0)}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">Amount (Tokens)</label>
+              <input
+                type="number"
+                value={resellForm.amount}
+                onChange={(e) => setResellForm({...resellForm, amount: e.target.value})}
+                placeholder="100"
+                className="input-field"
+              />
+            </div>
+            <div>
+              <label className="label">Price per Token (ETH)</label>
+              <input
+                type="number"
+                step="0.001"
+                value={resellForm.pricePerToken}
+                onChange={(e) => setResellForm({...resellForm, pricePerToken: e.target.value})}
+                placeholder="0.01"
+                className="input-field"
+              />
+            </div>
+          </div>
+          <div className="mt-6">
+            <button
+              onClick={resellTokens}
+              disabled={loading}
+              className="btn-primary flex items-center space-x-2"
+            >
+              <Building className="h-4 w-4" />
+              <span>List for Resale</span>
+            </button>
+          </div>
+          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <strong>Secondary Market:</strong> List your owned tokens for sale at your desired price. 
+              Other buyers can purchase them directly from you.
+            </p>
           </div>
         </div>
       )}

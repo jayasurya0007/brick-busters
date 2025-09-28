@@ -9,6 +9,10 @@ const InvestorDashboard = () => {
   const [properties, setProperties] = useState([]);
   const [tokenBalances, setTokenBalances] = useState({});
   const [revenueData, setRevenueData] = useState({});
+  const [withdrawForm, setWithdrawForm] = useState({
+    propertyId: '',
+    amount: ''
+  });
   const [loading, setLoading] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
 
@@ -303,6 +307,41 @@ const InvestorDashboard = () => {
     }
   };
 
+  const withdrawRevenue = async () => {
+    if (!withdrawForm.propertyId || !withdrawForm.amount) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    const property = properties.find(p => p.id === parseInt(withdrawForm.propertyId));
+    if (!property) {
+      toast.error('Property not found');
+      return;
+    }
+
+    const revenue = revenueData[property.id];
+    if (!revenue || Number(revenue.eth) < parseFloat(withdrawForm.amount)) {
+      toast.error('Insufficient revenue balance');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const tx = await contracts.multiPropertyManager.withdrawEthRevenue(
+        parseInt(withdrawForm.propertyId)
+      );
+      await tx.wait();
+      toast.success('Revenue withdrawn successfully');
+      setWithdrawForm({ propertyId: '', amount: '' });
+      await loadRevenueData();
+    } catch (error) {
+      console.error('Error withdrawing revenue:', error);
+      toast.error('Failed to withdraw revenue');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getMyProperties = () => {
     return properties.filter(property => {
       const balance = tokenBalances[property.id];
@@ -379,6 +418,60 @@ const InvestorDashboard = () => {
               </p>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Withdraw Revenue */}
+      <div className="card">
+        <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+          <Wallet className="h-5 w-5 mr-2" />
+          Withdraw Revenue
+        </h2>
+        <div className="grid md:grid-cols-2 gap-6">
+          <div>
+            <label className="label">Property ID</label>
+            <select
+              value={withdrawForm.propertyId}
+              onChange={(e) => setWithdrawForm({...withdrawForm, propertyId: e.target.value})}
+              className="input-field"
+            >
+              <option value="">Select Property</option>
+              {myProperties
+                .filter(property => revenueData[property.id] && Number(revenueData[property.id].eth) > 0)
+                .map(property => (
+                  <option key={property.id} value={property.id}>
+                    {property.name} ({property.symbol}) - Available: {ethers.formatEther(revenueData[property.id]?.eth || 0)} ETH
+                  </option>
+                ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Amount (ETH)</label>
+            <input
+              type="number"
+              step="0.001"
+              value={withdrawForm.amount}
+              onChange={(e) => setWithdrawForm({...withdrawForm, amount: e.target.value})}
+              placeholder="0.1"
+              className="input-field"
+            />
+          </div>
+        </div>
+        <div className="mt-6">
+          <button
+            onClick={withdrawRevenue}
+            disabled={loading || myProperties.length === 0}
+            className="btn-primary flex items-center space-x-2"
+          >
+            <Wallet className="h-4 w-4" />
+            <span>Withdraw Revenue</span>
+          </button>
+        </div>
+        <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <p className="text-sm text-green-800">
+            <strong>Revenue Withdrawal:</strong> Withdraw your proportional share of property revenue. 
+            Revenue is distributed based on your token ownership percentage.
+          </p>
         </div>
       </div>
 

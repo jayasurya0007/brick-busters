@@ -1,4 +1,4 @@
-# PropertyToken - Fractional Property Ownership Platform
+# BrickBusters- Fractional Property Ownership Platform
 
 A comprehensive React frontend for the MultiPropertyTokenManager system, providing fractional property ownership through blockchain technology. Built for the Integra Hackathon 2024.
 

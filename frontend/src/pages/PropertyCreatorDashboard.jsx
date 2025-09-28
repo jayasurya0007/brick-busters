@@ -12,6 +12,12 @@ const PropertyCreatorDashboard = () => {
     recipient: '',
     amount: ''
   });
+  const [listForm, setListForm] = useState({
+    propertyId: '',
+    amount: '',
+    pricePerToken: ''
+  });
+
   const [loading, setLoading] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
 
@@ -167,71 +173,63 @@ const PropertyCreatorDashboard = () => {
     }
   };
 
-  const prepareTokensForSale = async (propertyId) => {
-    const selectedProperty = properties.find(p => p.id === propertyId);
+  const listTokensForSale = async () => {
+    if (!listForm.propertyId || !listForm.amount || !listForm.pricePerToken) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    const selectedProperty = properties.find(p => p.id === parseInt(listForm.propertyId));
     if (!selectedProperty) {
       toast.error('Property not found');
       return;
     }
 
-    console.log('Selected property:', selectedProperty);
-    console.log('Current account:', account);
-    console.log('Property creator:', selectedProperty.creator);
-
     if (selectedProperty.creator.toLowerCase() !== account?.toLowerCase()) {
-      toast.error(`You can only prepare tokens for properties you created. This property was created by ${selectedProperty.creator.slice(0, 6)}...${selectedProperty.creator.slice(-4)}`);
+      toast.error('You can only list tokens for properties you created');
       return;
     }
 
     try {
       setLoading(true);
       
-      // Get the total tokens for this property
-      const property = await contracts.multiPropertyManager.properties(propertyId);
-      const totalTokens = property.totalTokens;
-      
-      console.log('Property total tokens:', totalTokens.toString());
-      console.log('Attempting to mint tokens...');
-      
-      // Mint all tokens to the creator
-      const mintTx = await contracts.multiPropertyManager.mintTokens(
-        propertyId,
-        account,
-        totalTokens
-      );
-      await mintTx.wait();
-      
-      console.log('Tokens minted successfully, now approving contract...');
-      
-      // Approve the contract to transfer tokens for trading
+      // First approve tokens for the marketplace contract
       const tokenContract = new ethers.Contract(
         selectedProperty.tokenContract,
         [
           "function approve(address spender, uint256 amount) external returns (bool)",
-          "function allowance(address owner, address spender) external view returns (uint256)"
+          "function balanceOf(address owner) external view returns (uint256)"
         ],
-        contracts.multiPropertyManager.signer
+        contracts.multiPropertyManager.runner
       );
+
+      const amount = ethers.parseEther(listForm.amount);
+      const balance = await tokenContract.balanceOf(account);
       
-      const approveTx = await tokenContract.approve(contracts.multiPropertyManager.address, totalTokens);
+      if (balance < amount) {
+        toast.error('Insufficient token balance');
+        return;
+      }
+
+      // Approve tokens for marketplace
+      const approveTx = await tokenContract.approve(
+        contracts.multiPropertyManager.target,
+        amount
+      );
       await approveTx.wait();
       
-      console.log('Contract approved successfully');
-      toast.success('Tokens minted and approved for trading successfully');
-      await loadProperties(); // Refresh properties
+      toast.success('Tokens approved for sale successfully. Buyers can now purchase them from the marketplace.');
+      setListForm({ propertyId: '', amount: '', pricePerToken: '' });
+      await loadProperties();
     } catch (error) {
-      console.error('Error preparing tokens for sale:', error);
-      if (error.message.includes('Ownable: caller is not the owner')) {
-        toast.error('You are not authorized to mint tokens for this property. Only the property creator or contract owner can mint tokens.');
-      } else if (error.message.includes('Unauthorized')) {
-        toast.error('You are not authorized to mint tokens for this property.');
-      } else {
-        toast.error(`Failed to prepare tokens for sale: ${error.message}`);
-      }
+      console.error('Error approving tokens for sale:', error);
+      toast.error('Failed to approve tokens for sale');
     } finally {
       setLoading(false);
     }
   };
+
+
 
   const getMyProperties = () => {
     return properties.filter(property => 
@@ -334,6 +332,62 @@ const PropertyCreatorDashboard = () => {
         )}
       </div>
 
+      {/* List Tokens for Sale */}
+      <div className="card">
+        <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+          <TrendingUp className="h-5 w-5 mr-2" />
+          List Tokens for Sale
+        </h2>
+        <div className="grid md:grid-cols-3 gap-6">
+          <div>
+            <label className="label">Property ID</label>
+            <select
+              value={listForm.propertyId}
+              onChange={(e) => setListForm({...listForm, propertyId: e.target.value})}
+              className="input-field"
+            >
+              <option value="">Select Property</option>
+              {myProperties.map(property => (
+                <option key={property.id} value={property.id}>
+                  {property.name} ({property.symbol})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Amount (Tokens)</label>
+            <input
+              type="number"
+              value={listForm.amount}
+              onChange={(e) => setListForm({...listForm, amount: e.target.value})}
+              placeholder="100"
+              className="input-field"
+            />
+          </div>
+          <div>
+            <label className="label">Price per Token (ETH)</label>
+            <input
+              type="number"
+              step="0.001"
+              value={listForm.pricePerToken}
+              onChange={(e) => setListForm({...listForm, pricePerToken: e.target.value})}
+              placeholder="0.01"
+              className="input-field"
+            />
+          </div>
+        </div>
+        <div className="mt-6">
+          <button
+            onClick={listTokensForSale}
+            disabled={loading || myProperties.length === 0}
+            className="btn-primary flex items-center space-x-2"
+          >
+            <TrendingUp className="h-4 w-4" />
+            <span>List for Sale</span>
+          </button>
+        </div>
+      </div>
+
       {/* My Properties */}
       <div className="card">
         <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
@@ -366,11 +420,14 @@ const PropertyCreatorDashboard = () => {
                 <div className="flex space-x-2">
                   {property.creator.toLowerCase() === account?.toLowerCase() ? (
                     <button 
-                      onClick={() => prepareTokensForSale(property.id)}
+                      onClick={() => {
+                        setMintForm({...mintForm, propertyId: property.id.toString()});
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
                       disabled={loading}
                       className="btn-primary text-sm flex-1"
                     >
-                      {loading ? 'Preparing...' : 'Prepare for Sale'}
+                      Mint Tokens
                     </button>
                   ) : (
                     <div className="flex-1 text-sm text-gray-500 text-center py-2">
