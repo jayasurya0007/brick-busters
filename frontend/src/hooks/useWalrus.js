@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import walrusService from '../services/walrusService';
+import walrusService from '../services/localFileService';
 import toast from 'react-hot-toast';
 
 export const useWalrus = () => {

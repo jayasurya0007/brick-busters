@@ -1,9 +1,9 @@
 // Contract addresses from your deployment on Citrea testnet (Chain ID 5115)
 export const CONTRACT_ADDRESSES = {
   // Updated with latest deployment addresses with auto-verification KYC functionality
-  IDENTITY_REGISTRY: "0x4bB5a645bcEfc85b5Ca9e5283365e62D2adE5876",
-  COMPLIANCE_MODULE: "0x01890E7948BdbBB7d6a0EDaE396Af1bCEaB03e8c",
-  MULTI_PROPERTY_MANAGER: "0x071692F39260468A6A5E3E0699736b775b07136d"
+  IDENTITY_REGISTRY: "0x72a51Ba84Fe89F377046726251A36FA41f3E9aDd",
+  COMPLIANCE_MODULE: "0x4E71db78D1E44989b88d7561f314393c6C72952c",
+  MULTI_PROPERTY_MANAGER: "0x758d7aFf071bd0c721ACf0607EfA14b32a33339A"
 };
 
 // Network configuration - Updated to match your deployed contracts

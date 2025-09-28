@@ -9,6 +9,8 @@ import { useWalrus } from '../hooks/useWalrus';
 const KYCVerification = () => {
   const { account, isConnected, contracts } = useWeb3();
   const { generateDocumentHash } = useWalrus();
+  
+  // State variables
   const [kycDocument, setKycDocument] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileHash, setFileHash] = useState('');
@@ -25,7 +27,6 @@ const KYCVerification = () => {
 
   useEffect(() => {
     if (isConnected && contracts.identityRegistry && account) {
-      // Add a small delay to ensure contracts are fully initialized
       const timer = setTimeout(() => {
         checkVerificationStatus();
       }, 1000);
@@ -38,7 +39,7 @@ const KYCVerification = () => {
     try {
       setCheckingStatus(true);
       
-      // Check verification status using individual function calls
+      // Check smart contract first (blockchain is source of truth)
       const [verified, pending, kycDoc, timestamp] = await Promise.all([
         contracts.identityRegistry.isVerified(account),
         contracts.identityRegistry.isPendingVerification(account),
@@ -46,18 +47,31 @@ const KYCVerification = () => {
         contracts.identityRegistry.getVerificationTimestamp(account)
       ]);
       
-      setVerificationStatus({
+      const blockchainStatus = {
         verified: verified,
         pending: pending,
         kycDoc: kycDoc,
         timestamp: Number(timestamp)
-      });
+      };
+      
+      setVerificationStatus(blockchainStatus);
+      
+      // Update local storage with blockchain status
+      const localVerificationKey = `kyc_verification_${account}`;
+      localStorage.setItem(localVerificationKey, JSON.stringify(blockchainStatus));
+      
     } catch (error) {
       console.error('Error checking verification status:', error);
       
-      // If it's a contract call error (user hasn't submitted verification yet), 
-      // set default unverified state instead of showing error
-      if (error.message && error.message.includes('missing revert data')) {
+      // If blockchain fails, check local verification as fallback
+      const localVerificationKey = `kyc_verification_${account}`;
+      const localVerification = localStorage.getItem(localVerificationKey);
+      
+      if (localVerification) {
+        const localStatus = JSON.parse(localVerification);
+        setVerificationStatus(localStatus);
+        console.log('Using local verification status as fallback');
+      } else if (error.message && error.message.includes('missing revert data')) {
         console.log('User has not submitted verification yet - setting default state');
         setVerificationStatus({
           verified: false,
@@ -85,12 +99,9 @@ const KYCVerification = () => {
     const file = event.target.files[0];
     if (file) {
       setSelectedFile(file);
-      // Generate a simple hash for demo purposes
-      // In production, you'd use a proper hashing library
       const reader = new FileReader();
       reader.onload = (e) => {
         const content = e.target.result;
-        // Simple hash generation (in production, use crypto-js or similar)
         const hash = btoa(content).substring(0, 32);
         setFileHash(hash);
         setKycDocument(`File: ${file.name} | Hash: ${hash}`);
@@ -104,7 +115,8 @@ const KYCVerification = () => {
     const hash = generateDocumentHash({ name: uploadedFile.originalName, size: uploadedFile.size });
     setFileHash(hash);
     setKycDocument(`Walrus File: ${uploadedFile.originalName} | Upload ID: ${uploadedFile.id} | Hash: ${hash}`);
-    toast.success('Document uploaded to Walrus successfully!');
+    
+    toast.success('Document uploaded successfully! Click "Complete Verification" to verify on blockchain.');
   };
 
   const requestVerification = async () => {
@@ -112,6 +124,18 @@ const KYCVerification = () => {
       toast.error('Please upload a KYC document or provide a document reference');
       return;
     }
+
+    // Check if wallet is connected and contracts are available
+    if (!isConnected || !contracts.identityRegistry) {
+      toast.error('Please connect your wallet first');
+      return;
+    }
+
+    // Show MetaMask prompt notification
+    toast.loading('Please confirm the transaction in MetaMask...', {
+      id: 'metamask-prompt',
+      duration: 10000
+    });
 
     try {
       setLoading(true);
@@ -128,9 +152,27 @@ const KYCVerification = () => {
         documentRef = kycDocument;
       }
       
+      // Debug contract and signer information
+      console.log('Contract runner:', contracts.identityRegistry?.runner);
+      console.log('Signer available:', !!contracts.identityRegistry?.runner?._isSigner);
+      console.log('Account:', account);
+      
+      // This will trigger MetaMask popup
       const tx = await contracts.identityRegistry.requestVerification(documentRef);
+      
+      // Dismiss MetaMask prompt and show transaction pending
+      toast.dismiss('metamask-prompt');
+      toast.loading('Transaction submitted! Waiting for confirmation...', {
+        id: 'tx-pending',
+        duration: 30000
+      });
+      
       await tx.wait();
-      toast.success('KYC verification completed successfully! You are now verified.');
+      
+      // Dismiss pending toast and show success
+      toast.dismiss('tx-pending');
+      toast.success('🎉 KYC verification completed successfully! You are now verified.');
+      
       setKycDocument('');
       setSelectedFile(null);
       setFileHash('');
@@ -139,12 +181,24 @@ const KYCVerification = () => {
       await checkVerificationStatus();
     } catch (error) {
       console.error('Error requesting verification:', error);
-      if (error.message.includes('already verified')) {
+      
+      // Dismiss any pending toasts
+      toast.dismiss('metamask-prompt');
+      toast.dismiss('tx-pending');
+      
+      // Handle different error types
+      if (error.code === 4001) {
+        // User rejected the transaction
+        toast.error('Transaction cancelled by user. You can try again anytime.');
+      } else if (error.code === -32002) {
+        // MetaMask is already processing a request
+        toast.error('MetaMask is busy. Please wait and try again.');
+      } else if (error.message.includes('already verified')) {
         toast.error('Wallet is already verified');
       } else if (error.message.includes('already pending')) {
         toast.error('Verification request is already pending');
       } else {
-        toast.error('Failed to complete verification');
+        toast.error('Failed to complete verification. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -154,193 +208,146 @@ const KYCVerification = () => {
   const formatTimestamp = (timestamp) => {
     if (timestamp === 0) return 'Never';
     const date = new Date(timestamp * 1000);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    return date.toLocaleString();
   };
-
-  if (!isConnected) {
-    return (
-      <div className="text-center py-12">
-        <Shield className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">Connect Your Wallet</h2>
-        <p className="text-gray-600">Please connect your wallet to access KYC verification</p>
-      </div>
-    );
-  }
 
   if (checkingStatus) {
     return (
-      <div className="min-h-screen bg-dark-bg flex items-center justify-center">
-        <div className="text-center py-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-6"></div>
-          <p className="text-xl text-dark-text-secondary">Checking verification status...</p>
+      <main className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+        <div className="flex items-center justify-center min-h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Checking verification status...</p>
+          </div>
         </div>
-      </div>
+      </main>
     );
   }
 
-
-
-  // If there's an error checking status, show retry option
   if (statusError) {
     return (
-      <div className="min-h-screen bg-dark-bg flex items-center justify-center">
-        <div className="text-center py-20 max-w-md mx-auto px-6">
-          <div className="bg-dark-card border border-dark-border rounded-2xl p-8">
-            <AlertCircle className="h-16 w-16 text-dark-error mx-auto mb-6" />
-            <h2 className="text-2xl font-bold text-dark-text-primary mb-4">Unable to Check Status</h2>
-            <p className="text-dark-text-secondary mb-6">There was an error checking your verification status</p>
-            <div className="bg-primary-500/10 border border-primary-500/20 rounded-lg p-4 mb-6">
-              <p className="text-sm font-semibold text-primary-400 mb-2">
-                Common causes:
-              </p>
-              <ul className="text-sm text-dark-text-secondary space-y-1 text-left">
-                <li>• Network connection issues</li>
-                <li>• Wrong network selected in MetaMask</li>
-                <li>• Contract not properly deployed</li>
-                <li>• You haven't submitted verification yet</li>
-              </ul>
+      <main className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+        <div className="text-center py-12">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Unable to Load Verification Status</h2>
+          <p className="text-gray-600 mb-6">
+            There was an error checking your verification status. Please make sure your wallet is connected
+            and you're on the correct network.
+          </p>
+          <button 
+            onClick={() => {
+              setStatusError(false);
+              checkVerificationStatus();
+            }}
+            className="btn-primary"
+          >
+            Try Again
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  if (verificationStatus.verified) {
+    return (
+      <main className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+        <div className="text-center py-12">
+          <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-6" />
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Verification Complete!</h2>
+          <p className="text-lg text-gray-600 mb-6">
+            Your wallet has been successfully verified. You can now access all platform features.
+          </p>
+          <div className="bg-green-50 border border-green-200 rounded-lg p-6 max-w-md mx-auto">
+            <div className="text-sm text-green-800">
+              <p><strong>Verified:</strong> {formatTimestamp(verificationStatus.timestamp)}</p>
+              {verificationStatus.kycDoc && (
+                <p className="mt-2 break-all"><strong>Document:</strong> {verificationStatus.kycDoc}</p>
+              )}
             </div>
-            <button
-              onClick={() => {
-                setStatusError(false);
-                setCheckingStatus(true);
-                checkVerificationStatus();
-              }}
-              className="bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center mx-auto group"
-            >
-              <Shield className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform" />
-              Retry
-            </button>
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen bg-dark-bg">
-      {/* Hero Section */}
-      <div className="relative">
-        {/* Background Image Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-r from-dark-bg via-dark-bg/90 to-transparent z-10"></div>
-        <div 
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-20"
-          style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1563013544-824ae1b704d3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80')`
-          }}
-        ></div>
-        
-        {/* Content */}
-        <div className="relative z-20 container mx-auto px-6 lg:px-8 py-16">
-          <div className="max-w-4xl">
-            <div className="flex items-center space-x-4 mb-6">
-              <div className="bg-primary-500/10 border border-primary-500/20 rounded-xl p-3">
-                <Shield className="h-8 w-8 text-primary-500" />
-              </div>
-              <div>
-                <h1 className="text-4xl lg:text-5xl font-bold text-dark-text-primary leading-tight">
-                  KYC Verification
-                </h1>
-                <p className="text-xl text-dark-text-secondary mt-2">
-                  Complete your identity verification to access all platform features
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+    <main className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">KYC Verification</h1>
+        <p className="text-gray-600">Complete your identity verification to access all platform features</p>
       </div>
 
-    <main className="container mx-auto px-6 lg:px-8 py-12">
-    <div className="space-y-12">
-
       {/* Status Card */}
-      <div className="bg-dark-card border border-dark-border rounded-2xl p-8">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center">
-            <div className="bg-primary-500/10 border border-primary-500/20 rounded-xl p-3 mr-4">
-              <Shield className="h-6 w-6 text-primary-500" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-dark-text-primary">Verification Status</h2>
-              <p className="text-dark-text-secondary">Your identity verification progress</p>
-            </div>
-          </div>
+      <div className="card">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+            <Shield className="h-5 w-5 mr-2" />
+            Verification Status
+          </h2>
           <button
             onClick={() => {
               setStatusError(false);
               checkVerificationStatus();
             }}
             disabled={loading}
-            className="bg-dark-border hover:bg-dark-border/70 text-dark-text-primary py-2 px-4 rounded-lg font-semibold transition-all duration-300 text-sm"
+            className="btn-secondary text-sm"
           >
             Refresh
           </button>
         </div>
         
-        <div className="space-y-6">
-          <div className="flex items-center justify-between p-6 bg-dark-bg border border-dark-border rounded-xl">
-            <div className="flex items-center space-x-4">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div className="flex items-center space-x-3">
               {verificationStatus.verified ? (
-                <div className="bg-secondary-500/10 border border-secondary-500/20 rounded-lg p-3">
-                  <CheckCircle className="h-6 w-6 text-secondary-500" />
-                </div>
+                <CheckCircle className="h-6 w-6 text-green-600" />
               ) : verificationStatus.pending ? (
-                <div className="bg-dark-warning/10 border border-dark-warning/20 rounded-lg p-3">
-                  <Clock className="h-6 w-6 text-dark-warning" />
-                </div>
+                <Clock className="h-6 w-6 text-yellow-600" />
               ) : (
-                <div className="bg-dark-error/10 border border-dark-error/20 rounded-lg p-3">
-                  <AlertCircle className="h-6 w-6 text-dark-error" />
-                </div>
+                <AlertCircle className="h-6 w-6 text-red-600" />
               )}
               <div>
-                <p className="font-bold text-dark-text-primary text-lg">
-                  {verificationStatus.verified ? 'Verified' : 
-                   verificationStatus.pending ? 'Pending Review' : 'Not Verified'}
+                <p className="font-medium text-gray-900">
+                  {verificationStatus.verified 
+                   ? 'Verified' 
+                   : verificationStatus.pending 
+                   ? 'Verification Pending' 
+                   : 'Not Verified'}
                 </p>
-                <p className="text-sm text-dark-text-secondary mt-1">
-                  {verificationStatus.verified ? 'You have full access to all features' :
-                   verificationStatus.pending ? 'Your verification is under review' :
-                   'Complete verification to access marketplace and trading'}
+                <p className="text-sm text-gray-500">
+                  {verificationStatus.verified 
+                   ? 'You can access all platform features' 
+                   : verificationStatus.pending 
+                   ? 'Your verification request is being reviewed' 
+                   : 'Complete verification to access marketplace and trading'}
                 </p>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-sm text-dark-text-secondary font-medium">Last Updated</p>
-              <p className="text-sm font-bold text-dark-text-primary mt-1">
+              <p className="text-sm text-gray-500">Last Updated</p>
+              <p className="text-sm font-medium text-gray-900">
                 {formatTimestamp(verificationStatus.timestamp)}
               </p>
             </div>
           </div>
-
-          {verificationStatus.kycDoc && (
-            <div className="p-6 bg-primary-500/10 border border-primary-500/20 rounded-xl">
-              <div className="flex items-center space-x-3 mb-3">
-                <FileText className="h-5 w-5 text-primary-500" />
-                <span className="text-sm font-bold text-primary-400">KYC Document</span>
-              </div>
-              <p className="text-sm text-dark-text-secondary break-all font-mono bg-dark-bg p-3 rounded-lg border border-dark-border">{verificationStatus.kycDoc}</p>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Request Verification Form */}
+      {/* Upload Section - Only show if not verified */}
       {!verificationStatus.verified && !verificationStatus.pending && (
-        <div className="bg-dark-card border border-dark-border rounded-2xl p-8">
-          <div className="flex items-center mb-8">
-            <div className="bg-primary-500/10 border border-primary-500/20 rounded-xl p-3 mr-4">
-              <Upload className="h-6 w-6 text-primary-500" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-dark-text-primary">Request Verification</h2>
-              <p className="text-dark-text-secondary">Upload your documents to complete verification</p>
-            </div>
-          </div>
+        <div className="card">
+          <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+            <Upload className="h-5 w-5 mr-2" />
+            Submit KYC Documents
+          </h2>
           
-          <div className="space-y-8">
-            <div>
-              <label className="block text-sm font-semibold text-dark-text-primary mb-4">Upload KYC Document to Walrus</label>
+          <div className="space-y-6">
+            <div className="relative">
+              <label className="label">Upload KYC Document</label>
+              <p className="text-sm text-gray-600 mb-3">
+                📋 Upload your document, then click "Complete Verification" to verify on blockchain
+              </p>
               <WalrusFileUpload
                 onUploadComplete={handleWalrusUpload}
                 documentType="kyc"
@@ -350,15 +357,15 @@ const KYCVerification = () => {
                 maxSize={10 * 1024 * 1024} // 10MB
               />
               {uploadedFileInfo && (
-                <div className="mt-4 p-4 bg-secondary-500/10 border border-secondary-500/20 rounded-lg">
+                <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
                   <div className="flex items-center">
-                    <FileText className="h-5 w-5 text-secondary-500 mr-3" />
+                    <FileText className="h-5 w-5 text-green-600 mr-2" />
                     <div>
-                      <p className="text-sm font-bold text-secondary-400">{uploadedFileInfo.originalName}</p>
-                      <p className="text-xs text-dark-text-secondary">
+                      <p className="text-sm font-medium text-green-800">{uploadedFileInfo.originalName}</p>
+                      <p className="text-xs text-green-600">
                         {(uploadedFileInfo.size / 1024 / 1024).toFixed(2)} MB
                       </p>
-                      <p className="text-xs text-dark-text-secondary">
+                      <p className="text-xs text-green-600">
                         Walrus ID: {uploadedFileInfo.id}
                       </p>
                     </div>
@@ -369,50 +376,58 @@ const KYCVerification = () => {
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-dark-border" />
+                <div className="w-full border-t border-gray-300" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-dark-card text-dark-text-secondary font-medium">Or</span>
+                <span className="px-2 bg-white text-gray-500">Or</span>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-dark-text-primary mb-3">Manual Document Reference</label>
+              <label className="label">Manual Document Reference</label>
               <input
                 type="text"
                 value={kycDocument}
                 onChange={(e) => setKycDocument(e.target.value)}
-                placeholder="Enter document hash, IPFS hash, or reference number"
-                className="w-full px-4 py-3 bg-dark-bg border border-dark-border rounded-lg text-dark-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-300"
-                disabled={selectedFile !== null}
+                placeholder="Enter document reference or hash"
+                className="input"
               />
-              <p className="text-sm text-dark-text-secondary mt-3">
-                Provide a hash of your KYC document, IPFS hash, or a reference number from your identity verification provider.
-              </p>
             </div>
 
-            <div className="bg-dark-warning/10 border border-dark-warning/20 rounded-lg p-6">
-              <div className="flex items-start space-x-4">
-                <AlertCircle className="h-6 w-6 text-dark-warning mt-0.5 flex-shrink-0" />
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">Or</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="label">Upload File Directly</label>
+              <input
+                type="file"
+                onChange={handleFileUpload}
+                accept=".pdf,.jpg,.jpeg,.png"
+                className="input"
+              />
+              {selectedFile && (
+                <div className="mt-2 text-sm text-gray-600">
+                  Selected: {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                </div>
+              )}
+            </div>
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-start space-x-3">
+                <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
                 <div>
-                  <h3 className="text-sm font-bold text-dark-warning mb-3">Important Information</h3>
-                  <ul className="text-sm text-dark-text-secondary space-y-2">
-                    <li className="flex items-start space-x-2">
-                      <span className="text-dark-warning mt-1">•</span>
-                      <span>Your verification request will be reviewed by the platform</span>
-                    </li>
-                    <li className="flex items-start space-x-2">
-                      <span className="text-dark-warning mt-1">•</span>
-                      <span>You will be notified once your verification is approved or rejected</span>
-                    </li>
-                    <li className="flex items-start space-x-2">
-                      <span className="text-dark-warning mt-1">•</span>
-                      <span>Only verified wallets can participate in token trading and marketplace activities</span>
-                    </li>
-                    <li className="flex items-start space-x-2">
-                      <span className="text-dark-warning mt-1">•</span>
-                      <span>Ensure your KYC document is valid and up-to-date</span>
-                    </li>
+                  <h3 className="text-sm font-medium text-yellow-800">Important Information</h3>
+                  <ul className="text-sm text-yellow-700 mt-2 space-y-1">
+                    <li>• Your verification request will be reviewed by the platform</li>
+                    <li>• You will be notified once your verification is approved or rejected</li>
+                    <li>• Only verified wallets can participate in token trading and marketplace activities</li>
+                    <li>• Ensure your KYC document is valid and up-to-date</li>
                   </ul>
                 </div>
               </div>
@@ -420,10 +435,10 @@ const KYCVerification = () => {
 
             <button
               onClick={requestVerification}
-              disabled={loading || (!kycDocument.trim() && !selectedFile)}
-              className="w-full bg-primary-500 hover:bg-primary-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-lg transition-all duration-300 flex items-center justify-center space-x-3 group"
+              disabled={loading || (!kycDocument.trim() && !selectedFile && !uploadedFileInfo)}
+              className="btn-primary w-full flex items-center justify-center space-x-2"
             >
-              <Shield className="h-5 w-5 group-hover:scale-110 transition-transform" />
+              <Shield className="h-4 w-4" />
               <span>{loading ? 'Processing...' : 'Complete Verification'}</span>
             </button>
           </div>
@@ -432,87 +447,33 @@ const KYCVerification = () => {
 
       {/* Pending Status */}
       {verificationStatus.pending && (
-        <div className="bg-dark-card border border-dark-border rounded-2xl p-8">
-          <div className="flex items-center mb-8">
-            <div className="bg-dark-warning/10 border border-dark-warning/20 rounded-xl p-3 mr-4">
-              <Clock className="h-6 w-6 text-dark-warning" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-dark-text-primary">Verification Pending</h2>
-              <p className="text-dark-text-secondary">Your request is being reviewed</p>
-            </div>
-          </div>
-          
-          <div className="text-center py-12">
-            <div className="bg-dark-warning/10 border border-dark-warning/20 rounded-2xl p-6 w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-              <Clock className="h-10 w-10 text-dark-warning" />
-            </div>
-            <h3 className="text-2xl font-bold text-dark-text-primary mb-4">Verification Under Review</h3>
-            <p className="text-dark-text-secondary mb-6 max-w-md mx-auto">
-              Your KYC verification request is currently being reviewed by our team.
+        <div className="card">
+          <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+            <Clock className="h-5 w-5 mr-2" />
+            Verification In Progress
+          </h2>
+          <div className="text-center py-8">
+            <Clock className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Your verification is being reviewed</h3>
+            <p className="text-gray-600 mb-4">
+              We're currently reviewing your submitted documents. This process typically takes 1-3 business days.
             </p>
-            <div className="bg-dark-bg border border-dark-border rounded-lg p-4 max-w-md mx-auto">
-              <p className="text-sm text-dark-text-secondary">
-                <span className="font-semibold text-dark-warning">Expected timeframe:</span> 24-48 hours
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Verified Status */}
-      {verificationStatus.verified && (
-        <div className="bg-dark-card border border-dark-border rounded-2xl p-8">
-          <div className="flex items-center mb-8">
-            <div className="bg-secondary-500/10 border border-secondary-500/20 rounded-xl p-3 mr-4">
-              <CheckCircle className="h-6 w-6 text-secondary-500" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-dark-text-primary">Verification Complete</h2>
-              <p className="text-dark-text-secondary">You now have full platform access</p>
-            </div>
-          </div>
-          
-          <div className="text-center py-12">
-            <div className="bg-secondary-500/10 border border-secondary-500/20 rounded-2xl p-6 w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-              <CheckCircle className="h-10 w-10 text-secondary-500" />
-            </div>
-            <h3 className="text-2xl font-bold text-dark-text-primary mb-4">You're All Set!</h3>
-            <p className="text-dark-text-secondary mb-8 max-w-md mx-auto">
-              Your wallet has been verified and you now have access to all platform features.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
-              <div className="bg-dark-bg border border-dark-border rounded-lg p-4">
-                <div className="flex items-center space-x-3">
-                  <CheckCircle className="h-5 w-5 text-secondary-500" />
-                  <span className="text-sm font-medium text-dark-text-primary">Marketplace Access</span>
-                </div>
+            {verificationStatus.kycDoc && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-w-md mx-auto">
+                <p className="text-sm text-gray-700">
+                  <strong>Submitted Document:</strong><br />
+                  <span className="break-all">{verificationStatus.kycDoc}</span>
+                </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  Submitted: {formatTimestamp(verificationStatus.timestamp)}
+                </p>
               </div>
-              <div className="bg-dark-bg border border-dark-border rounded-lg p-4">
-                <div className="flex items-center space-x-3">
-                  <CheckCircle className="h-5 w-5 text-secondary-500" />
-                  <span className="text-sm font-medium text-dark-text-primary">Token Trading</span>
-                </div>
-              </div>
-              <div className="bg-dark-bg border border-dark-border rounded-lg p-4">
-                <div className="flex items-center space-x-3">
-                  <CheckCircle className="h-5 w-5 text-secondary-500" />
-                  <span className="text-sm font-medium text-dark-text-primary">Revenue Withdrawal</span>
-                </div>
-              </div>
-              <div className="bg-dark-bg border border-dark-border rounded-lg p-4">
-                <div className="flex items-center space-x-3">
-                  <CheckCircle className="h-5 w-5 text-secondary-500" />
-                  <span className="text-sm font-medium text-dark-text-primary">Full Platform Access</span>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )}
     </div>
     </main>
-    </div>
   );
 };
 

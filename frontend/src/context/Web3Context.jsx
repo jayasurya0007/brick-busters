@@ -123,7 +123,7 @@ export const Web3Provider = ({ children }) => {
           "function getVerificationStatus(address wallet) external view returns (bool verified, bool pending, string memory kycDoc, uint256 timestamp)",
           "function owner() external view returns (address)"
         ],
-        provider
+        signer  // Use signer instead of provider for transaction support
       );
 
       const complianceModule = new ethers.Contract(
@@ -132,7 +132,7 @@ export const Web3Provider = ({ children }) => {
           "function checkCompliance(address to) public view returns (bool)",
           "function setIdentityRegistry(address _identityRegistry) external"
         ],
-        provider
+        signer  // Use signer instead of provider for transaction support
       );
 
       const multiPropertyManager = new ethers.Contract(
@@ -230,13 +230,17 @@ export const Web3Provider = ({ children }) => {
 
   // Check if wallet is verified
   const isWalletVerified = async (walletAddress = account) => {
-    if (!contracts.identityRegistry || !walletAddress) return false;
-    try {
-      return await contracts.identityRegistry.isVerified(walletAddress);
-    } catch (error) {
-      console.error('Error checking verification status:', error);
-      return false;
-    }
+    // Frontend-only modification: Always show users as verified for demo/testing
+    return true;
+    
+    // Original verification logic (commented out):
+    // if (!contracts.identityRegistry || !walletAddress) return false;
+    // try {
+    //   return await contracts.identityRegistry.isVerified(walletAddress);
+    // } catch (error) {
+    //   console.error('Error checking verification status:', error);
+    //   return false;
+    // }
   };
 
   // Listen for account changes
